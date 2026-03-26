@@ -1,0 +1,2693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brian Simulator</title>
+<script>
+// Auto-update: check every 30s if a new version has been deployed, reload if so
+(function(){
+  var BUILD = '20260325a';
+  setInterval(function(){
+    fetch(location.href, {cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
+      var m = t.match(/var BUILD = '([^']+)'/);
+      if (m && m[1] !== BUILD) location.reload();
+    }).catch(function(){});
+  }, 30000);
+})();
+</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Courier New', Consolas, monospace;
+  background: #0d0d0d;
+  color: #c8c8c8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+#topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; border-bottom: 1px solid #333; background: #111;
+  flex-wrap: wrap; gap: 6px;
+}
+#topbar h1 { font-size: 18px; margin: 0; letter-spacing: -0.5px; color: #e0e0e0; }
+#phase-label { font-size: 13px; color: #777; font-style: italic; }
+#topbar-controls { display: flex; gap: 4px; }
+#topbar-controls button {
+  font-size: 11px; padding: 3px 8px; border: 1px solid #444;
+  background: #1a1a1a; color: #aaa; cursor: pointer; font-family: inherit;
+}
+#topbar-controls button:hover { background: #252525; color: #ccc; }
+#main {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px; padding: 6px; max-width: 1400px; margin: 0 auto;
+}
+.panel {
+  border: 1px solid #2a2a2a; padding: 10px; margin-bottom: 6px; background: #141414;
+}
+#panel-upgrades #upgrades-list {
+  max-height: 300px; overflow-y: auto;
+}
+#panel-upgrades #upgrades-list::-webkit-scrollbar { width: 4px; }
+#panel-upgrades #upgrades-list::-webkit-scrollbar-thumb { background: #333; }
+.panel h2 {
+  font-size: 13px; font-weight: bold; margin: 0 0 6px 0;
+  padding-bottom: 4px; border-bottom: 1px solid #252525;
+  text-transform: uppercase; letter-spacing: 0.5px; color: #888;
+}
+/* Action buttons */
+.action-btn {
+  display: block; width: 100%; padding: 5px 8px; margin: 3px 0;
+  border: 1px solid #333; background: #1a1a1a; cursor: pointer;
+  text-align: left; font-size: 12px; font-family: inherit;
+  color: #bbb;
+}
+.action-btn:hover:not(:disabled) { background: #222; }
+.action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.action-btn .cost { color: #666; font-size: 11px; }
+.action-btn .gain { color: #5a5; font-size: 11px; }
+.automation-box {
+  border: 1px solid #2b3a2b; background: #121812; padding: 8px; margin-bottom: 6px;
+}
+.automation-title {
+  display: flex; justify-content: space-between; align-items: center;
+  color: #9c9; font-size: 12px; font-weight: bold; margin-bottom: 6px;
+}
+.automation-rate { color: #6a6; font-size: 11px; font-weight: normal; }
+.automation-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin: 4px 0; font-size: 11px; color: #777;
+}
+.automation-select {
+  width: 100%; padding: 4px; border: 1px solid #354235; background: #141a14;
+  color: #bbb; font-size: 11px; font-family: inherit;
+}
+.automation-slider {
+  width: 100%; margin: 4px 0; accent-color: #5a5;
+}
+.automation-note { color: #666; font-size: 10px; }
+/* Upgrade buttons */
+.upgrade-btn {
+  display: block; width: 100%; padding: 6px 8px; margin: 3px 0;
+  border: 1px solid #2a2a3a; background: #161620; cursor: pointer;
+  text-align: left; font-size: 12px; font-family: inherit; color: #aab;
+}
+.upgrade-btn:hover:not(:disabled):not(.purchased) { background: #1e1e2e; }
+.upgrade-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.upgrade-btn.affordable { border-color: #3a6a3a; background: #1a2a1a; }
+.upgrade-btn.purchased { opacity: 0.2; text-decoration: line-through; cursor: default; pointer-events: none; }
+.upgrade-btn .u-cost { color: #666; font-size: 11px; }
+.upgrade-btn .u-desc { color: #777; font-size: 11px; display: block; margin-top: 1px; }
+/* Friend buy buttons */
+.friend-btn {
+  display: inline-block; padding: 4px 8px; margin: 2px 4px 2px 0;
+  border: 1px solid #3a3520; background: #1a1810; cursor: pointer;
+  font-size: 11px; font-family: inherit; color: #aa9;
+}
+.friend-btn:hover:not(:disabled) { background: #222010; }
+.friend-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.friend-btn.affordable { border-color: #3a6a3a; background: #1a2a1a; }
+/* Routine buttons */
+.routine-btn {
+  display: block; width: 100%; padding: 5px 8px; margin: 3px 0;
+  border: 1px solid #2a3320; background: #161a10; cursor: pointer;
+  text-align: left; font-size: 12px; font-family: inherit; color: #aa9;
+}
+.routine-btn:hover:not(:disabled):not(.active) { background: #1e2218; }
+.routine-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.routine-btn.affordable { border-color: #3a6a3a; background: #1a2a1a; }
+.routine-btn.active { border-color: #4a4a20; background: #1a1a10; opacity: 0.5; pointer-events: none; }
+.routine-btn .r-cost { color: #666; font-size: 11px; }
+.routine-btn .r-desc { color: #777; font-size: 11px; display: block; margin-top: 1px; }
+/* Initiative buttons */
+.initiative-btn {
+  display: block; width: 100%; padding: 5px 8px; margin: 3px 0;
+  border: 1px solid #333; background: #181818; cursor: pointer;
+  font-size: 12px; font-family: inherit; text-align: left; color: #aaa;
+}
+.initiative-btn:hover:not(:disabled):not(.purchased) { background: #222; }
+.initiative-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.initiative-btn.affordable { border-color: #3a6a3a; background: #1a2a1a; }
+.initiative-btn.purchased { opacity: 0.4; border-color: #2a3a2a; pointer-events: none; }
+/* Team button */
+.team-btn {
+  display: inline-block; padding: 4px 10px; margin: 4px 0;
+  border: 1px solid #2a3333; background: #141a1a; cursor: pointer;
+  font-size: 12px; font-family: inherit; color: #9aa;
+}
+.team-btn:hover:not(:disabled) { background: #1a2222; }
+.team-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.team-btn.affordable { border-color: #3a6a3a; background: #1a2a1a; }
+/* Project buttons */
+.project-choice {
+  display: flex; gap: 6px; margin: 6px 0;
+}
+.project-btn {
+  flex: 1; padding: 8px; border: 1px solid #2a2a40; background: #161622;
+  cursor: pointer; font-size: 12px; font-family: inherit; text-align: left; color: #99a;
+}
+.project-btn:hover { background: #1e1e30; border-color: #3a3a55; }
+.project-btn .p-name { font-weight: bold; display: block; color: #bbf; }
+.project-btn .p-desc { color: #777; font-size: 11px; display: block; margin-top: 2px; }
+.project-chosen { padding: 4px 0; font-size: 12px; color: #777; }
+.project-chosen b { color: #88b; }
+/* Reality project buttons */
+.reality-btn {
+  display: block; width: 100%; padding: 6px 8px; margin: 3px 0;
+  border: 1px solid #302040; background: #1a1425; cursor: pointer;
+  font-size: 12px; font-family: inherit; text-align: left; color: #a8a;
+}
+.reality-btn:hover:not(:disabled):not(.purchased) { background: #221830; }
+.reality-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.reality-btn.purchased { opacity: 0.3; text-decoration: line-through; pointer-events: none; }
+.reality-btn.affordable { border-color: #524; background: #251830; }
+.reality-btn .r-cost { color: #666; font-size: 11px; }
+/* Remember buttons */
+.remember-btn {
+  display: block; width: 100%; padding: 6px 8px; margin: 3px 0;
+  border: 1px solid #30302a; background: #1a1a14; cursor: pointer;
+  font-size: 12px; font-family: inherit; text-align: left; color: #aa8;
+}
+.remember-btn:hover:not(:disabled):not(.purchased) { background: #22221a; }
+.remember-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.remember-btn.purchased { opacity: 0.4; border-color: #3a3a20; pointer-events: none; }
+.remember-btn.affordable { border-color: #5a5a20; background: #252518; }
+/* Resources display */
+.res-line {
+  font-family: inherit;
+  font-size: 13px; padding: 2px 0;
+}
+.res-val { font-weight: bold; color: #e0e0e0; }
+.res-rate { color: #666; font-size: 11px; }
+.res-label { color: #888; }
+/* Energy bar */
+.energy-bar-wrap {
+  width: 100%; height: 8px; background: #1a1a1a; border: 1px solid #333;
+  margin: 2px 0 6px 0;
+}
+.energy-bar-fill {
+  height: 100%; transition: width 0.2s, background-color 0.3s;
+}
+/* Opinion bar */
+.opinion-bar-wrap {
+  width: 100%; height: 16px; background: #1a1a1a; border: 1px solid #444;
+  position: relative; margin: 4px 0;
+}
+.opinion-bar-fill {
+  height: 100%; transition: width 0.3s, background-color 0.3s;
+}
+.opinion-label {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: bold; line-height: 16px; color: #ddd;
+  text-shadow: 0 0 3px #000;
+}
+/* Decay bar */
+.decay-bar-wrap {
+  width: 100%; height: 6px; background: #1a1a1a; border: 1px solid #333;
+  margin: 2px 0;
+}
+.decay-bar-fill {
+  height: 100%; transition: width 0.3s;
+}
+/* Message log */
+#message-log {
+  max-height: 600px; overflow-y: auto; font-size: 12px; line-height: 1.6;
+}
+#message-log::-webkit-scrollbar { width: 4px; }
+#message-log::-webkit-scrollbar-thumb { background: #333; }
+.msg { padding: 2px 0; border-bottom: 1px solid #1a1a1a; }
+.msg-thought { font-style: italic; color: #888; }
+.msg-event { font-weight: bold; color: #ddd; }
+.msg-system { color: #555; font-size: 11px; }
+.msg-project { color: #6688cc; }
+.msg-board { color: #cc9944; }
+.msg-cosmic { color: #aa66dd; }
+.msg-ending { text-align: center; font-size: 16px; font-weight: bold; color: #e0e0e0; }
+.msg-time { color: #444; font-size: 10px; margin-right: 4px; }
+/* Stats */
+#stats-display { font-family: inherit; font-size: 12px; color: #888; }
+#stats-display div { padding: 1px 0; }
+/* Panel visibility - all hidden by default, JS shows them */
+.panel-locked { display: none !important; }
+/* Board meeting modal */
+#board-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: #181818; border: 1px solid #444; padding: 20px;
+  z-index: 1000; max-width: 420px; width: 90%;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+}
+#board-modal h3 { font-size: 14px; margin-bottom: 8px; color: #cc9944; }
+#board-modal p { font-size: 13px; margin-bottom: 12px; line-height: 1.5; color: #bbb; }
+#board-modal .board-options { display: flex; gap: 8px; }
+#board-modal .board-btn {
+  flex: 1; padding: 10px; border: 1px solid #444; background: #1a1a1a;
+  cursor: pointer; font-size: 12px; font-family: inherit; text-align: left; color: #bbb;
+}
+#board-modal .board-btn:hover { background: #252525; }
+#board-modal .board-btn b { display: block; margin-bottom: 3px; color: #ddd; }
+#board-modal .board-timer { font-size: 11px; color: #555; text-align: center; margin-top: 8px; }
+.modal-hidden { display: none !important; }
+/* Ending overlay */
+#ending-overlay {
+  position: fixed; inset: 0; background: rgba(10,10,10,0.97);
+  z-index: 2000; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 40px;
+}
+#ending-overlay.modal-hidden { display: none !important; }
+#ending-content { max-width: 600px; text-align: center; font-size: 16px; line-height: 2; color: #ccc; }
+#ending-content .ending-line { margin: 8px 0; opacity: 0; transition: opacity 1s; }
+#ending-content .ending-line.visible { opacity: 1; }
+#ending-choices { margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+#ending-choices button {
+  padding: 12px 24px; border: 1px solid #444; background: #1a1a1a;
+  cursor: pointer; font-size: 14px; font-family: inherit; color: #ccc;
+}
+#ending-choices button:hover { background: #252525; }
+/* Transcend button */
+.transcend-btn {
+  display: block; width: 100%; padding: 10px; margin: 8px 0;
+  border: 1px solid #524; background: #201030; cursor: pointer;
+  font-size: 14px; font-weight: bold; font-family: inherit;
+  text-align: center; color: #c8a;
+}
+.transcend-btn:hover { background: #2a1840; }
+/* Responsive */
+@media (max-width: 900px) {
+  #main { grid-template-columns: 1fr; }
+  .project-choice { flex-direction: column; }
+}
+/* Import/export modal */
+#io-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: #181818; border: 1px solid #444; padding: 20px; z-index: 1000;
+  max-width: 500px; width: 90%; box-shadow: 0 4px 30px rgba(0,0,0,0.6); color: #bbb;
+}
+#io-modal textarea { width: 100%; height: 120px; font-size: 11px; font-family: monospace; margin: 8px 0; background: #111; color: #aaa; border: 1px solid #333; padding: 8px; }
+#io-modal button { padding: 5px 12px; margin-right: 4px; cursor: pointer; font-family: inherit; background: #1a1a1a; border: 1px solid #444; color: #aaa; }
+#io-modal button:hover { background: #252525; }
+#io-modal.modal-hidden { display: none !important; }
+/* Progress bar at very top */
+#game-progress {
+  position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+  background: #1a1a1a; z-index: 3000;
+}
+#game-progress-fill {
+  height: 100%; width: 0%; transition: width 0.5s ease;
+  background: linear-gradient(90deg, #3a6a3a, #5a5);
+}
+body { padding-top: 3px; }
+/* Phase subtitle */
+#phase-subtitle {
+  font-size: 11px; color: #555; font-style: italic; font-weight: normal;
+  margin-left: 8px; letter-spacing: 0.3px;
+}
+/* Time played in topbar */
+#time-played {
+  font-size: 11px; color: #555; font-family: inherit;
+  margin-right: 8px; white-space: nowrap;
+}
+/* Panel entrance animation */
+@keyframes panel-highlight {
+  0% { background: #1a2018; box-shadow: 0 0 8px rgba(80,120,50,0.3); }
+  100% { background: #141414; box-shadow: none; }
+}
+.panel-new {
+  animation: panel-highlight 1.5s ease-out;
+}
+/* NEW badge */
+.new-badge {
+  display: inline-block; font-size: 9px; font-weight: bold;
+  color: #5a5; background: #1a2a1a; border: 1px solid #3a5a3a;
+  padding: 0 4px; margin-left: 6px; border-radius: 2px;
+  letter-spacing: 0.5px; vertical-align: middle;
+  animation: badge-fade 4s ease-out forwards;
+}
+@keyframes badge-fade {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Floating numbers */
+.float-num {
+  position: fixed;
+  pointer-events: none;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: inherit;
+  color: #5a5;
+  z-index: 5000;
+  animation: float-up 1.2s ease-out forwards;
+  text-shadow: 0 0 4px rgba(80,160,80,0.3);
+}
+.float-num.wisdom { color: #a8a; text-shadow: 0 0 4px rgba(160,80,160,0.3); }
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+/* Combo indicator */
+#combo-indicator {
+  position: fixed; bottom: 12px; right: 12px;
+  font-size: 14px; font-weight: bold; color: #5a5;
+  font-family: inherit; z-index: 4000;
+  opacity: 0; transition: opacity 0.3s;
+  text-shadow: 0 0 6px rgba(80,160,80,0.4);
+}
+#combo-indicator.active { opacity: 1; }
+/* Affordable pulse */
+@keyframes affordable-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(80,160,80,0); }
+  50% { box-shadow: 0 0 6px rgba(80,160,80,0.15); }
+}
+.upgrade-btn.affordable, .initiative-btn.affordable, .remember-btn.affordable, .reality-btn.affordable {
+  animation: affordable-pulse 2s ease-in-out infinite;
+}
+/* Phase transition flash */
+@keyframes phase-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+#phase-flash {
+  position: fixed; inset: 0; background: #fff;
+  z-index: 4500; pointer-events: none;
+  opacity: 0;
+}
+#phase-flash.flash {
+  animation: phase-flash 1.5s ease-out forwards;
+}
+/* Bulk buy toggle */
+.bulk-toggle {
+  display: inline-flex; gap: 0; margin-bottom: 6px;
+}
+.bulk-toggle button {
+  padding: 2px 8px; font-size: 10px; font-family: inherit;
+  border: 1px solid #333; background: #1a1a1a; color: #888; cursor: pointer;
+}
+.bulk-toggle button:hover { background: #222; }
+.bulk-toggle button.active { background: #1a2a1a; color: #5a5; border-color: #3a5a3a; }
+/* Trend arrows */
+.trend-up { color: #4a4; }
+.trend-down { color: #a44; }
+.trend-flat { color: #555; }
+/* Milestone hint */
+.milestone-hint {
+  font-size: 11px; color: #555; font-style: italic;
+  padding: 4px 0; border-top: 1px solid #1a1a1a; margin-top: 6px;
+}
+/* Keyboard hint */
+.key-hint {
+  font-size: 9px; color: #bbb; margin-left: 4px;
+  font-family: 'Courier New', monospace;
+}
+</style>
+</head>
+<body class="phase-1">
+
+<div id="game-progress"><div id="game-progress-fill"></div></div>
+
+<div id="phase-flash"></div>
+<div id="combo-indicator"></div>
+
+<div id="topbar">
+  <div>
+    <h1>Brian Simulator <span id="phase-subtitle">just a regular guy</span></h1>
+    <span id="phase-label">Phase 1: Just Brian</span>
+  </div>
+  <div id="topbar-controls">
+    <span id="time-played">0m 0s</span>
+    <button onclick="saveGame()">Save</button>
+    <button onclick="showExport()">Export</button>
+    <button onclick="showImport()">Import</button>
+    <button onclick="resetGame()">Reset</button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- LEFT COLUMN -->
+  <div id="col-left">
+    <div class="panel" id="panel-actions">
+      <h2>Actions</h2>
+      <div id="actions-list"></div>
+    </div>
+    <div class="panel" id="panel-upgrades">
+      <h2>Upgrades</h2>
+      <div id="upgrades-list"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-routines">
+      <h2>Routines</h2>
+      <div id="routines-list"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-projects">
+      <h2>Brian Projects</h2>
+      <div id="projects-list"></div>
+    </div>
+  </div>
+
+  <!-- CENTER COLUMN -->
+  <div id="col-center">
+    <div class="panel" id="panel-status">
+      <h2>Brian Status</h2>
+      <div id="resource-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-friends">
+      <h2>Friends</h2>
+      <div id="friends-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-initiatives">
+      <h2>Initiatives</h2>
+      <div id="initiatives-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-team">
+      <h2>Brian's Team</h2>
+      <div id="team-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-opinion">
+      <h2>Public Opinion</h2>
+      <div id="opinion-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-decay">
+      <h2>The Unraveling</h2>
+      <div id="decay-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-remember">
+      <h2>Remember</h2>
+      <div id="remember-display"></div>
+    </div>
+    <div class="panel panel-locked" id="panel-reality">
+      <h2>Reality Projects</h2>
+      <div id="reality-display"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div id="col-right">
+    <div class="panel" id="panel-thoughts">
+      <h2>Brian's Thoughts</h2>
+      <div id="message-log"></div>
+    </div>
+    <div class="panel" id="panel-stats">
+      <h2>Statistics</h2>
+      <div id="stats-display"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BOARD MEETING MODAL -->
+<div id="board-modal" class="modal-hidden">
+  <h3>Board Meeting</h3>
+  <p id="board-situation"></p>
+  <div class="board-options">
+    <button class="board-btn" id="board-opt-a"></button>
+    <button class="board-btn" id="board-opt-b"></button>
+  </div>
+  <div class="board-timer" id="board-timer"></div>
+</div>
+
+<!-- ENDING OVERLAY -->
+<div id="ending-overlay" class="modal-hidden">
+  <div id="ending-content"></div>
+  <div id="ending-choices"></div>
+</div>
+
+<!-- IO MODAL -->
+<div id="io-modal" class="modal-hidden">
+  <h3 id="io-title">Export</h3>
+  <textarea id="io-text"></textarea>
+  <div>
+    <button id="io-action-btn">Copy</button>
+    <button onclick="document.getElementById('io-modal').classList.add('modal-hidden')">Close</button>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// DATA DEFINITIONS
+// =========================================================================
+
+const SUFFIXES = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc','QaDc'];
+
+function fmt(n) {
+  if (n === undefined || n === null || isNaN(n)) return '0';
+  if (n < 0) return '-' + fmt(-n);
+  if (n < 1) return n === 0 ? '0' : n.toFixed(2);
+  if (n < 10) return n.toFixed(1);
+  if (n < 1000) return Math.floor(n).toString();
+  let i = 0;
+  while (n >= 1000 && i < SUFFIXES.length - 1) { n /= 1000; i++; }
+  return (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : n.toFixed(0)) + SUFFIXES[i];
+}
+
+function fmtTime(s) {
+  if (s < 60) return Math.floor(s) + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + Math.floor(s%60) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+// ---- ACTIONS ----
+// Phase 1 only. Phase 2 removes manual actions in favor of Routines.
+// Phase 4 adds "Contemplate" action.
+const ACTIONS = [
+  { id:'be_brian', name:'Be Brian', phase:1, energyCost:1, cpGain:1, unlockTotalCp:0, desc:'Just... be.' },
+  { id:'coffee', name:'Make Coffee', phase:1, energyCost:3, cpGain:2, unlockTotalCp:20, desc:'A simple cup.' },
+  { id:'walk', name:'Go for a Walk', phase:1, energyCost:5, cpGain:6, unlockTotalCp:75, desc:'Fresh air.' },
+  { id:'talk', name:'Talk to Someone', phase:1, energyCost:8, cpGain:11, unlockTotalCp:200, desc:'Human connection.' },
+  { id:'work', name:'Go to Work', phase:1, energyCost:15, cpGain:23, unlockTotalCp:500, desc:'The daily grind.' },
+  { id:'read', name:'Read a Book', phase:1, energyCost:10, cpGain:17, unlockTotalCp:1000, desc:'Knowledge is power.' },
+  { id:'cook', name:'Cook a Nice Meal', phase:1, energyCost:12, cpGain:22, unlockTotalCp:2000, desc:'Culinary arts.' },
+  { id:'gym', name:'Hit the Gym', phase:1, energyCost:20, cpGain:40, unlockTotalCp:4000, desc:'Endorphins.' },
+  { id:'meetup', name:'Attend a Meetup', phase:1, energyCost:25, cpGain:55, unlockTotalCp:8000, desc:'Networking.' },
+  { id:'dinner_party', name:'Host a Dinner Party', phase:1, energyCost:32, cpGain:82, unlockTotalCp:10000, desc:'Curate the room.' },
+  { id:'give_talk', name:'Give a Talk', phase:1, energyCost:40, cpGain:118, unlockTotalCp:12000, desc:'Command the room.' },
+  { id:'big_event', name:'Throw a Big Event', phase:1, energyCost:55, cpGain:170, unlockTotalCp:14000, desc:'Become the center of gravity.' },
+  // Phase 4: Contemplate (always available once in Phase 4)
+  { id:'contemplate', name:'Contemplate', phase:4, energyCost:10, cpGain:0, wisdomGain:0.1, unlockTotalCp:0, desc:'Think about everything. And nothing.' },
+];
+
+const ACTIONS_BASE = ACTIONS.map(a => ({...a}));
+
+function resetActionsToBase() {
+  for (const base of ACTIONS_BASE) {
+    const action = ACTIONS.find(a => a.id === base.id);
+    if (action) {
+      for (const key of Object.keys(base)) action[key] = base[key];
+    }
+  }
+}
+
+function reapplyUpgradeActionEffects() {
+  resetActionsToBase();
+  const makeSink = () => new Proxy(function(){}, {
+    get: (t, p) => (p === Symbol.toPrimitive) ? () => 0 : makeSink(),
+    set: () => true,
+    apply: () => makeSink()
+  });
+  const dummy = makeSink();
+  for (const u of UPGRADES) {
+    if (game.upgrades[u.id]) u.effect(dummy);
+  }
+}
+
+// ---- FRIEND TYPES ----
+// Core loop: Energy -> Charisma -> Friends -> Energy regen
+// Phase 2+: Friends also generate Rep/s
+const FRIEND_TYPES = [
+  { id:'acquaintances', name:'Acquaintance', baseCost:5, growth:1.12, cpPerSec:0, repPerSec:0.05, energyRegen:0.1, special:'+0.1 energy/s' },
+  { id:'close', name:'Close Friend', baseCost:50, growth:1.25, cpPerSec:0, repPerSec:0.3, energyRegen:0.5, special:'+0.5 energy/s' },
+  { id:'best', name:'Best Friend', baseCost:250, growth:1.5, cpPerSec:0, repPerSec:1.0, energyRegen:1.5, special:'+1.5 energy/s' },
+  { id:'mentors', name:'Mentor', baseCost:500, growth:1.8, cpPerSec:0, repPerSec:2.0, energyRegen:0.8, special:'+0.8 energy/s' },
+];
+
+// ---- ROUTINES ----
+// Phase 2 automation: auto-perform actions but permanently reduce max energy
+// The tension: more automation = less energy budget = need more friends
+const ROUTINES = [
+  { id:'routine_coffee', name:'Morning Coffee', actionId:'coffee', interval:5, energyDrain:10, cost:200, unlockFn:g=>g.phase>=2 },
+  { id:'routine_walk', name:'Daily Walk', actionId:'walk', interval:4, energyDrain:15, cost:500, unlockFn:g=>g.phase>=2&&g.totalCp>=16000 },
+  { id:'routine_talk', name:'Conversation Practice', actionId:'talk', interval:6, energyDrain:12, cost:800, unlockFn:g=>g.phase>=2&&g.totalCp>=20000 },
+  { id:'routine_work', name:'Work Ethic', actionId:'work', interval:3, energyDrain:20, cost:1500, unlockFn:g=>g.phase>=2&&g.totalCp>=30000 },
+  { id:'routine_read', name:'Reading Habit', actionId:'read', interval:5, energyDrain:15, cost:2000, unlockFn:g=>g.phase>=2&&g.totalCp>=50000 },
+  { id:'routine_cook', name:'Meal Prep', actionId:'cook', interval:4, energyDrain:18, cost:3000, unlockFn:g=>g.phase>=2&&g.totalCp>=80000 },
+  { id:'routine_gym', name:'Gym Routine', actionId:'gym', interval:3, energyDrain:25, cost:5000, unlockFn:g=>g.phase>=2&&g.totalCp>=120000 },
+  { id:'routine_meetup', name:'Social Calendar', actionId:'meetup', interval:4, energyDrain:30, cost:8000, unlockFn:g=>g.phase>=2&&g.totalCp>=180000 },
+];
+
+// ---- INITIATIVES ----
+// Phase 3: Spend Reputation to launch Influence streams. Each affects Opinion.
+const INITIATIVES = [
+  { id:'media', name:'Media Campaign', cost:500, infPerSec:2, opinionDelta:-5, desc:'+2 Inf/s, -5 Opinion' },
+  { id:'charity', name:'Charity Gala', cost:800, infPerSec:3, opinionDelta:5, desc:'+3 Inf/s, +5 Opinion' },
+  { id:'tech_venture', name:'Tech Venture', cost:1200, infPerSec:5, opinionDelta:-8, desc:'+5 Inf/s, -8 Opinion' },
+  { id:'culture', name:'Cultural Movement', cost:2000, infPerSec:8, opinionDelta:-3, desc:'+8 Inf/s, -3 Opinion' },
+  { id:'politics', name:'Political Connections', cost:3500, infPerSec:12, opinionDelta:-15, desc:'+12 Inf/s, -15 Opinion' },
+  { id:'expansion', name:'Global Expansion', cost:6000, infPerSec:20, opinionDelta:-10, desc:'+20 Inf/s, -10 Opinion' },
+  { id:'philanthropy', name:'Philanthropy Empire', cost:10000, infPerSec:15, opinionDelta:15, desc:'+15 Inf/s, +15 Opinion' },
+  { id:'research', name:'Strange Research', cost:20000, infPerSec:5, opinionDelta:-20, desc:'+5 Inf/s, -20 Opinion. Something unsettling...', flag:'strangeResearch' },
+];
+
+const BASE_ENERGY_REGEN = 0.5;
+const ENERGY_REGEN_BONUSES = {
+  p1_energy2: 0.6,
+  p1_energy3: 1.0,
+  p1_energy4: 1.0,
+};
+const AUTOMATION_TIER_UPGRADES = [
+  { upgradeId: 'p1_auto_brian', actionIds: ['be_brian'], maxRate: 1.5 },
+  { upgradeId: 'p1_auto_habits', actionIds: ['coffee', 'walk', 'talk', 'work', 'read', 'cook'], maxRate: 3 },
+  { upgradeId: 'p1_auto_social', actionIds: ['gym', 'meetup', 'dinner_party', 'give_talk', 'big_event'], maxRate: 5 },
+];
+
+// ---- UPGRADES ----
+const UPGRADES = [
+  // Phase 1
+  { id:'p1_energy1', name:'Multivitamins', cost:15, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=10,
+    desc:'+25 max energy', effect: g=>{ g.maxEnergy += 25; } },
+  { id:'p1_coffee', name:'Better Coffee Machine', cost:30, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=30,
+    desc:'Make Coffee gives +2 Charisma', effect: g=>{ findAction('coffee').cpGain += 2; } },
+  { id:'p1_energy2', name:'Better Sleep Schedule', cost:60, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=50,
+    desc:`Energy regen +${ENERGY_REGEN_BONUSES.p1_energy2}/s`, effect: g=>{ g.energyRegen += ENERGY_REGEN_BONUSES.p1_energy2; } },
+  { id:'p1_shoes', name:'Running Shoes', cost:100, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=100,
+    desc:'Walk gives +3 Charisma', effect: g=>{ findAction('walk').cpGain += 3; } },
+  { id:'p1_wardrobe', name:'New Wardrobe', cost:250, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=250,
+    desc:'Talk gives +4 Charisma', effect: g=>{ findAction('talk').cpGain += 4; } },
+  { id:'p1_combo1', name:'Flow State', cost:350, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=300,
+    desc:'Combo window +0.75s', effect: g=>{ g.comboWindowBonus += 0.75; } },
+  { id:'p1_click1', name:'Social Awareness', cost:400, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=400,
+    desc:'+1 Charisma per action (all)', effect: g=>{ g.clickBonus += 1; } },
+  { id:'p1_energy3', name:'Meditation Practice', cost:600, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=600,
+    desc:`Energy regen +${ENERGY_REGEN_BONUSES.p1_energy3}/s`, effect: g=>{ g.energyRegen += ENERGY_REGEN_BONUSES.p1_energy3; } },
+  { id:'p1_cookbook', name:'Cookbook', cost:1200, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=1200,
+    desc:'Cook gives +4 Charisma', effect: g=>{ findAction('cook').cpGain += 4; } },
+  { id:'p1_combo2', name:'Warm Hands', cost:1600, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=1500,
+    desc:'Combo thresholds 20% easier', effect: g=>{ g.comboThresholdMult *= 0.8; } },
+  { id:'p1_energy4', name:'Power Naps', cost:2000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=2000,
+    desc:`+50 max energy, +${ENERGY_REGEN_BONUSES.p1_energy4}/s regen`, effect: g=>{ g.maxEnergy += 50; g.energyRegen += ENERGY_REGEN_BONUSES.p1_energy4; } },
+  { id:'p1_click2', name:'Confidence Boost', cost:3000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=3000,
+    desc:'+2 Charisma per action (all)', effect: g=>{ g.clickBonus += 2; } },
+  { id:'p1_combo3', name:'Adrenaline Loop', cost:4500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=4500,
+    desc:'Combo multipliers x1.25', effect: g=>{ g.comboMultStrength *= 1.25; } },
+  { id:'p1_gym', name:'Gym Membership', cost:5000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=5000,
+    desc:'Gym gives +8 Charisma, costs -5 energy', effect: g=>{ findAction('gym').cpGain += 8; findAction('gym').energyCost -= 5; } },
+  { id:'p1_combo4', name:'Perfect Rhythm', cost:8500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=9000,
+    desc:'Manual actions add +1 extra combo', effect: g=>{ g.comboGain += 1; } },
+  { id:'p1_networking', name:'Networking Book', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=9000,
+    desc:'Meetup gives +12 Charisma', effect: g=>{ findAction('meetup').cpGain += 12; } },
+  { id:'p1_charm', name:'Natural Charm', cost:12000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12000,
+    desc:'All Charisma gains x1.5', effect: g=>{ g.globalCpMult *= 1.5; } },
+  { id:'p1_combo5', name:'Perfect Flow', cost:10000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12500,
+    desc:'Combo window +1s and combo multipliers x1.2', effect: g=>{ g.comboWindowBonus += 1; g.comboMultStrength *= 1.2; } },
+  { id:'p1_auto_brian', name:'Auto Being Brian', cost:4000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=7000,
+    desc:'Unlock Auto Brian. Automate Be Brian with a rate slider up to 1.5/s.', effect: g=>{} },
+  { id:'p1_auto_habits', name:'Habit Stacking', cost:6500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=10000&&g.upgrades.p1_auto_brian,
+    desc:'Automation can run Coffee, Walk, Talk, Work, Read, and Cook. Rate cap 3/s.', effect: g=>{} },
+  { id:'p1_auto_social', name:'Social Autopilot', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12500&&g.upgrades.p1_auto_habits,
+    desc:'Automation can run Gym, Meetup, Dinner Party, Give a Talk, and Big Event. Rate cap 5/s.', effect: g=>{} },
+  // Phase 2 (8 upgrades - thinned)
+  { id:'p2_friend1', name:'Friend Finder App', cost:300, currency:'cp', phase:2, unlockFn: g=>g.phase>=2,
+    desc:'Acquaintances cost -20%', effect: g=>{ g.friendCostMult.acquaintances *= 0.8; } },
+  { id:'p2_energy5', name:'Espresso Machine', cost:500, currency:'cp', phase:2, unlockFn: g=>g.phase>=2&&g.totalCp>=16000,
+    desc:'+100 max energy', effect: g=>{ g.maxEnergy += 100; } },
+  { id:'p2_friend2', name:'Inner Circle', cost:800, currency:'cp', phase:2, unlockFn: g=>g.reputation>=50,
+    desc:'Close Friends energy regen x2', effect: g=>{ g.friendRegenMult.close *= 2; } },
+  { id:'p2_energy6', name:'Personal Trainer', cost:1200, currency:'cp', phase:2, unlockFn: g=>g.reputation>=200,
+    desc:'All friend energy regen x1.5', effect: g=>{ g.globalFriendRegenMult *= 1.5; } },
+  { id:'p2_mentor1', name:'Mentorship Program', cost:2000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=500,
+    desc:'Mentors rep/s x2', effect: g=>{ g.friendRepMult.mentors *= 2; } },
+  { id:'p2_rep1', name:'Personal Brand', cost:4000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=1500,
+    desc:'All Rep gain x2', effect: g=>{ g.repMult *= 2; } },
+  { id:'p2_rep2', name:'TED Talk', cost:8000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=4000,
+    desc:'All Rep gain x3', effect: g=>{ g.repMult *= 3; } },
+  { id:'p2_mega', name:"Brian's Manifesto", cost:12000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=7000,
+    desc:'All Charisma production x2', effect: g=>{ g.globalCpMult *= 2; } },
+  // Phase 3 (6 upgrades)
+  { id:'p3_pr', name:'PR Department', cost:500, currency:'influence', phase:3, unlockFn: g=>g.phase>=3,
+    desc:'Opinion drifts toward 50 faster', effect: g=>{ g.opinionDriftMult *= 2; } },
+  { id:'p3_media', name:'Media Empire', cost:2000, currency:'influence', phase:3, unlockFn: g=>g.influence>=500,
+    desc:'All Charisma gains x5', effect: g=>{ g.globalCpMult *= 5; } },
+  { id:'p3_lobbying', name:'Lobbying Power', cost:5000, currency:'influence', phase:3, unlockFn: g=>g.influence>=2000,
+    desc:'Initiative costs -30%', effect: g=>{ g.initiativeCostMult *= 0.7; } },
+  { id:'p3_global', name:'Global Reach', cost:10000, currency:'influence', phase:3, unlockFn: g=>g.influence>=5000,
+    desc:'Rep gain x10', effect: g=>{ g.repMult *= 10; } },
+  { id:'p3_research', name:'Anomalous Findings', cost:30000, currency:'influence', phase:3, unlockFn: g=>g.flags.strangeResearch,
+    desc:'Brian\'s scientists discover something that shouldn\'t exist...', effect: g=>{ g.flags.anomalousFindings = true; } },
+  { id:'p3_protocol', name:'The Brian Protocol', cost:100000, currency:'influence', phase:3, unlockFn: g=>g.flags.anomalousFindings&&g.influence>=50000,
+    desc:'Prepare for what comes next.', effect: g=>{ g.flags.protocolReady = true; } },
+];
+
+function findAction(id) { return ACTIONS.find(a=>a.id===id); }
+
+function setAutomationRate(value) {
+  const config = sanitizeAutomationState();
+  game.automation.rate = Math.max(0, Math.min(parseFloat(value) || 0, config.maxRate));
+  if (game.automation.rate === 0) game.automation.progress = 0;
+  updateUI();
+}
+
+function setAutomationTarget(actionId) {
+  const choices = getAutomationActionChoices();
+  if (!choices.some(a => a.id === actionId)) return;
+  game.automation.targetAction = actionId;
+  game.automation.progress = 0;
+  updateUI();
+}
+
+// ---- BRIAN PROJECTS ----
+const PROJECTS = [
+  // Phase 2 (5 projects)
+  { id:1, phase:2, unlockFn:g=>g.reputation>=200,
+    a:{name:"Introvert's Edge",desc:"All passive Rep +50%",effect:g=>{g.repMult*=1.5;}},
+    b:{name:"Extrovert's Edge",desc:"All click Charisma +50%",effect:g=>{g.clickCpMult*=1.5;}} },
+  { id:2, phase:2, unlockFn:g=>g.reputation>=800,
+    a:{name:"Quality over Quantity",desc:"Close/Best friends regen x2, Acquaintance cost +50%",effect:g=>{g.friendRegenMult.close*=2;g.friendRegenMult.best*=2;g.friendCostMult.acquaintances*=1.5;}},
+    b:{name:"Quantity over Quality",desc:"Acquaintance cost -50%, Close/Best cost +50%",effect:g=>{g.friendCostMult.acquaintances*=0.5;g.friendCostMult.close*=1.5;g.friendCostMult.best*=1.5;}} },
+  { id:3, phase:2, unlockFn:g=>g.reputation>=2000,
+    a:{name:"Humble Beginnings",desc:"Rep gain +100% but Charisma gains -20%",effect:g=>{g.repMult*=2;g.globalCpMult*=0.8;}},
+    b:{name:"Bold Moves",desc:"Charisma gains +50% but Rep gain -30%",effect:g=>{g.globalCpMult*=1.5;g.repMult*=0.7;}} },
+  { id:4, phase:2, unlockFn:g=>g.reputation>=5000,
+    a:{name:"Patience",desc:"Energy regen x3",effect:g=>{g.energyRegen*=3;}},
+    b:{name:"Hustle",desc:"Max energy x3 but regen halved",effect:g=>{g.maxEnergy*=3;g.energyRegen*=0.5;}} },
+  { id:5, phase:2, unlockFn:g=>g.reputation>=8000,
+    a:{name:"Authentic Brian",desc:"Public Opinion starts at 70 in Phase 3",effect:g=>{g.flags.startOpinion70=true;}},
+    b:{name:"Strategic Brian",desc:"First 3 initiatives cost no Opinion",effect:g=>{g.flags.freeInitiatives=3;}} },
+  // Phase 3 (4 projects)
+  { id:6, phase:3, unlockFn:g=>g.phase>=3&&g.influence>=100,
+    a:{name:"Public Figure",desc:"Opinion gains x2, losses x2",effect:g=>{g.opinionGainMult*=2;g.opinionLossMult*=2;}},
+    b:{name:"Behind the Scenes",desc:"Opinion locked at 50",effect:g=>{g.flags.opinionLocked=true;}} },
+  { id:7, phase:3, unlockFn:g=>g.influence>=2000,
+    a:{name:"Benevolent Brian",desc:"+1 Opinion/s, but Influence gain -20%",effect:g=>{g.flags.benevolent=true;g.infMult*=0.8;}},
+    b:{name:"Ruthless Brian",desc:"All Influence x2, but -0.5 Opinion/s",effect:g=>{g.infMult*=2;g.flags.ruthless=true;}} },
+  { id:8, phase:3, unlockFn:g=>g.influence>=20000,
+    a:{name:"The Brian Foundation",desc:"Auto-convert excess Charisma to Rep",effect:g=>{g.flags.autoConvertCpRep=true;}},
+    b:{name:"Brian Ventures Fund",desc:"Auto-convert excess Rep to Influence",effect:g=>{g.flags.autoConvertRepInf=true;}} },
+  { id:9, phase:3, unlockFn:g=>g.influence>=100000,
+    a:{name:"Prepare for Transcendence",desc:"Phase 4 decay rates halved",effect:g=>{g.decayMult*=0.5;}},
+    b:{name:"Maximize the Material",desc:"All Phase 3 production x5",effect:g=>{g.globalCpMult*=5;g.infMult*=5;g.repMult*=5;}} },
+  // Phase 4 (2 projects)
+  { id:10, phase:4, unlockFn:g=>g.phase>=4&&g.wisdom>=5,
+    a:{name:"Brian Remembers",desc:"Retain humanity (affects ending)",effect:g=>{g.flags.humanity=true;}},
+    b:{name:"Brian Evolves",desc:"Lose humanity. Wisdom gain x3.",effect:g=>{g.flags.humanity=false;g.wisdomGainMult*=3;}} },
+  { id:11, phase:4, unlockFn:g=>g.wisdom>=500,
+    a:{name:"The Compassionate Path",desc:"Keep friends through the unraveling",effect:g=>{g.flags.compassionatePath=true;}},
+    b:{name:"The Absolute Path",desc:"Friends dissolve into Wisdom immediately",effect:g=>{
+      const total=totalFriends(g);g.wisdom+=total*0.5;g.totalWisdom+=total*0.5;
+      g.friends={acquaintances:0,close:0,best:0,mentors:0};g.flags.absolutePath=true;}} },
+];
+
+// ---- REMEMBER PURCHASES ----
+// Phase 4: Spend Wisdom to slow the decay of what you built
+const REMEMBER = [
+  { id:'remember_coffee', name:'Remember Coffee', desc:'Slow Charisma decay by 50%', cost:10, flag:'slowCpDecay' },
+  { id:'remember_friends', name:'Remember Friends', desc:'Stop losing friends to the void', cost:25, flag:'stopFriendLoss' },
+  { id:'remember_reputation', name:'Remember Reputation', desc:'Slow Reputation decay by 50%', cost:50, flag:'slowRepDecay' },
+  { id:'remember_influence', name:'Remember Influence', desc:'Slow Influence decay by 50%', cost:100, flag:'slowInfDecay' },
+  { id:'remember_humanity', name:'Remember Humanity', desc:'Hold on to who Brian was.', cost:200, flag:'rememberHumanity' },
+];
+
+// ---- REALITY PROJECTS ----
+// Phase 4: Linear tech tree, costs Wisdom
+const REALITY_PROJECTS = [
+  { id:'perceive', name:'Perceive the Multiverse', cost:50, desc:'See beyond this reality.', prereq:null, effect:g=>{g.wisdomGainMult*=1.5;} },
+  { id:'fold', name:'Fold Spacetime', cost:200, desc:'Bend the rules.', prereq:'perceive', effect:g=>{g.wisdomGainMult*=2;} },
+  { id:'rewrite', name:'Rewrite Physics', cost:1000, desc:'The laws were suggestions all along.', prereq:'fold', effect:g=>{g.wisdomGainMult*=3;} },
+  { id:'equation', name:'The Brian Equation', cost:5000, desc:'B = everything.', prereq:'rewrite', effect:g=>{g.flags.equationSolved=true;} },
+  { id:'consume', name:'Consume the Universe', cost:20000, desc:'There is only Brian.', prereq:'equation', effect:g=>{g.flags.consumed=true; triggerEnding();} },
+  // Secret alien path
+  { id:'alien', name:'Alien Collaboration', cost:500, desc:'They know your name. x5 Wisdom gain.', prereq:'perceive', unlockFn:g=>g.flags.alienContact, effect:g=>{g.wisdomGainMult*=5;g.flags.endingC=true;} },
+];
+
+// ---- BOARD MEETINGS ----
+const BOARD_MEETINGS = [
+  // tier 1: gentle intro meetings (first 1-2 encounters)
+  { tier:1, situation:"A hospital reports that 14 babies were named Brian last month.",
+    a:{name:"Host a Brian Baby Shower",desc:"+10 Opinion, +3 Acquaintances",effect:g=>{g.publicOpinion+=10;g.friends.acquaintances+=3;}},
+    b:{name:"Send Signed Onesies",desc:"+5 Opinion, +500 Inf",effect:g=>{g.publicOpinion+=5;g.influence+=500;}} },
+  { tier:1, situation:"Brian's cat has gone viral online. 47 million views and counting.",
+    a:{name:"Monetize the Cat",desc:"+3000 Inf, -10 Opinion",effect:g=>{g.influence+=3000;g.publicOpinion-=10;addMsg("BrianCat merch is selling out. The cat looks unimpressed.",'event');}},
+    b:{name:"Protect the Cat's Privacy",desc:"+15 Opinion",effect:g=>{g.publicOpinion+=15;addMsg("The cat purrs. True friendship can't be monetized.",'thought');}} },
+  { tier:1, situation:"A competitor emerges, copying Brian's style.",
+    a:{name:"Acquire Them",desc:"+500 Inf, -10 Opinion",effect:g=>{g.influence+=500;g.publicOpinion-=10;}},
+    b:{name:"Ignore Them",desc:"+5 Opinion",effect:g=>{g.publicOpinion+=5;}} },
+  // tier 2: moderate meetings (after 2+ encounters)
+  { tier:2, situation:"A scandal rumor is circulating about Brian.",
+    a:{name:"Cover It Up",desc:"-2000 Charisma, Opinion unchanged",effect:g=>{g.cp=Math.max(0,g.cp-2000);}},
+    b:{name:"Address It Publicly",desc:"-5 Opinion now, +1000 Charisma",effect:g=>{g.publicOpinion-=5;g.cp+=1000;}} },
+  { tier:2, situation:"A major celebrity is publicly begging to be Brian's friend.",
+    a:{name:"Accept the Friendship",desc:"+5000 Inf, -5 Opinion",effect:g=>{g.influence+=5000;g.friends.close+=2;g.publicOpinion-=5;}},
+    b:{name:"Leave Them on Read",desc:"+20 Opinion",effect:g=>{g.publicOpinion+=20;addMsg("The internet loses its mind. 'Brian is unattainable.'",'event');}} },
+  { tier:2, situation:"Brian's autobiography ghostwriter has gone rogue and is writing fan fiction instead.",
+    a:{name:"Publish It Anyway",desc:"+8000 Inf, -15 Opinion",effect:g=>{g.influence+=8000;g.publicOpinion-=15;addMsg("'Brian and the Dragon Dimension' debuts at #1.",'event');}},
+    b:{name:"Sue the Ghostwriter",desc:"+10 Opinion",effect:g=>{g.publicOpinion+=10;}} },
+  // tier 3: high-stakes meetings (after 4+ encounters)
+  { tier:3, situation:"The government wants to investigate Brian Inc.",
+    a:{name:"Cooperate Fully",desc:"-1000 Inf, +15 Opinion",effect:g=>{g.influence=Math.max(0,g.influence-1000);g.publicOpinion+=15;}},
+    b:{name:"Stonewall",desc:"+500 Inf, -20 Opinion",effect:g=>{g.influence+=500;g.publicOpinion-=20;}} },
+  { tier:3, situation:"An existential audit reveals the company's only product is... Brian.",
+    unlockFn:g=>g.influence>=10000,
+    a:{name:"Double Down on Brian",desc:"Rep x2, +10000 Inf, -10 Opinion",effect:g=>{g.repMult*=2;g.influence+=10000;g.publicOpinion-=10;addMsg("Brian IS the product. Always was.",'event');}},
+    b:{name:"Diversify",desc:"+5 Opinion, +2000 Rep",effect:g=>{g.publicOpinion+=5;g.reputation+=2000;}} },
+  { tier:3, situation:"The board convenes an emergency session: 'Is Brian even real? Like, philosophically?'",
+    unlockFn:g=>g.influence>=20000,
+    a:{name:"Prove Brian Is Real",desc:"-10000 Inf, +20 Opinion",effect:g=>{g.influence=Math.max(0,g.influence-10000);g.publicOpinion+=20;addMsg("Brian pinches himself. 'See? Real.' The board is unconvinced but impressed.",'thought');}},
+    b:{name:"Lean Into the Mystery",desc:"+15000 Inf, -10 Opinion",effect:g=>{g.influence+=15000;g.publicOpinion-=10;addMsg("'Maybe Brian is an idea,' Brian says. The stock price triples.",'event');}} },
+  // special: gated by resources, no tier restriction
+  { situation:"Deep space sensors detect an unusual signal. It seems... intentional.",
+    unlockFn:g=>g.influence>=50000 && !g.flags.alienContact,
+    a:{name:"Investigate Signal",desc:"-10000 Inf, establish alien contact",effect:g=>{g.influence=Math.max(0,g.influence-10000);g.flags.alienContact=true;addMsg("The signal responds. Something out there knows Brian's name.",'cosmic');}},
+    b:{name:"Dismiss It",desc:"Probably nothing.",effect:g=>{}} },
+];
+
+// ---- THOUGHTS ----
+const THOUGHTS = [
+  // ===== Phase 1: The Awakening =====
+  { id:'start', cond:g=>g.totalTicks<=2, text:"Brian wakes up. He has a simple thought: just... be Brian.", type:'thought' },
+  { id:'first_cp', cond:g=>g.totalCp>=1 && !g.thoughtFlags.first_cp, text:"One Charisma point. It's not much, but it's honest work.", type:'thought' },
+  { id:'cp5', cond:g=>g.totalCp>=5 && !g.thoughtFlags.cp5, text:"People seem to notice Brian today. Interesting.", type:'thought' },
+  { id:'cp10', cond:g=>g.totalCp>=10 && !g.thoughtFlags.cp10, text:"Brian's starting to feel like maybe... just maybe... there's something more.", type:'thought' },
+  { id:'coffee_unlock', cond:g=>g.totalCp>=20 && !g.thoughtFlags.coffee_unlock, text:"Brian notices the coffee machine. Maybe that would help.", type:'thought' },
+  { id:'energy_lesson', cond:g=>g.energy<=5 && g.stats.actions>=10 && !g.thoughtFlags.energy_lesson, text:"Brian is exhausted. There's a lesson here about pacing, about the finite hours in a day. He'll learn it. Eventually.", type:'thought' },
+  { id:'friends_unlock', cond:g=>g.totalCp>=25 && !g.thoughtFlags.friends_unlock, text:"Brian could use some friends. Without them, the energy just... runs out.", type:'thought' },
+  { id:'first_friend', cond:g=>totalFriends(g)>=1 && !g.thoughtFlags.first_friend, text:"Brian made a friend. The energy feels different now. Sustainable. Like someone plugged in a charger.", type:'thought' },
+  { id:'cp40', cond:g=>g.totalCp>=40 && !g.thoughtFlags.cp40, text:"Brian catches himself smiling at a stranger. The stranger smiles back. Something unlocks.", type:'thought' },
+  { id:'friends5', cond:g=>totalFriends(g)>=5 && !g.thoughtFlags.friends5, text:"Five friends. The energy flows steadily now. Brian can actually sustain this.", type:'thought' },
+  { id:'walk_unlock', cond:g=>g.totalCp>=75 && !g.thoughtFlags.walk_unlock, text:"Brian steps outside. The air tastes like possibility. When did that start?", type:'thought' },
+  { id:'cp100', cond:g=>g.totalCp>=100 && !g.thoughtFlags.cp100, text:"A coworker said 'You seem different lately, Brian.' Huh.", type:'thought' },
+  { id:'cp150', cond:g=>g.totalCp>=150 && !g.thoughtFlags.cp150, text:"Brian keeps a running tally in his head. Of what? He's not sure yet.", type:'thought' },
+  { id:'talk_unlock', cond:g=>g.totalCp>=200 && !g.thoughtFlags.talk_unlock, text:"Brian opens his mouth and people actually listen. This is new.", type:'thought' },
+  { id:'cp350', cond:g=>g.totalCp>=350 && !g.thoughtFlags.cp350, text:"Something is building. Brian can feel it. People gravitate toward him now.", type:'thought' },
+  { id:'work_unlock', cond:g=>g.totalCp>=500 && !g.thoughtFlags.work_unlock, text:"The daily grind. But it doesn't grind Brian anymore. Brian grinds it.", type:'thought' },
+  { id:'cp750', cond:g=>g.totalCp>=750 && !g.thoughtFlags.cp750, text:"Brian's phone hasn't stopped buzzing. Everyone wants to hang out with Brian.", type:'thought' },
+  { id:'read_unlock', cond:g=>g.totalCp>=1000 && !g.thoughtFlags.read_unlock, text:"Brian picks up a book. Finishes a chapter. Looks up. The room seems smaller. He's outgrowing something.", type:'thought' },
+  { id:'cp1500', cond:g=>g.totalCp>=1500 && !g.thoughtFlags.cp1500, text:"Fifteen hundred. Brian overhears his name in a coffee shop he's never visited.", type:'thought' },
+  { id:'cook_unlock', cond:g=>g.totalCp>=2000 && !g.thoughtFlags.cook_unlock, text:"Brian cooks dinner for the first time in months. It's actually good. When did that happen?", type:'thought' },
+  { id:'cp3000', cond:g=>g.totalCp>=3000 && !g.thoughtFlags.cp3000, text:"Brian can feel it. A quiet gravity pulling people in. They don't know why. Neither does he.", type:'thought' },
+  { id:'gym_unlock', cond:g=>g.totalCp>=4000 && !g.thoughtFlags.gym_unlock, text:"The endorphins hit different. Brian catches his reflection and nods.", type:'thought' },
+  { id:'first_gym5', cond:g=>g.stats.gymClicks>=5 && !g.thoughtFlags.first_gym5, text:"The barbell doesn't feel heavy anymore. Brian wonders what else he's been carrying that he could put down.", type:'thought' },
+  { id:'cp6000', cond:g=>g.totalCp>=6000 && !g.thoughtFlags.cp6000, text:"Six thousand. A stranger holds the door open for Brian and says 'After you, sir.' The 'sir' is genuine.", type:'thought' },
+  { id:'meetup_unlock', cond:g=>g.totalCp>=8000 && !g.thoughtFlags.meetup_unlock, text:"A room full of strangers, and Brian walks in like he belongs. He does belong. When did that happen?", type:'thought' },
+  { id:'cp10000', cond:g=>g.totalCp>=10000 && !g.thoughtFlags.cp10000, text:"Ten thousand. Brian isn't just a person anymore. He's becoming a force.", type:'thought' },
+  { id:'cp12000', cond:g=>g.totalCp>=12000 && !g.thoughtFlags.cp12000, text:"Brian can feel it. He's outgrowing this life. Something bigger is coming.", type:'thought' },
+  { id:'actions50', cond:g=>g.stats.actions>=50 && !g.thoughtFlags.actions50, text:"Fifty things done today. Brian used to struggle to do five. The compound interest of showing up.", type:'thought' },
+  { id:'actions200', cond:g=>g.stats.actions>=200 && !g.thoughtFlags.actions200, text:"Two hundred actions taken. Brian is a verb now, not a noun. To Brian: to persist beyond reason.", type:'thought' },
+
+  // ===== Phase 2: The Reputation Economy =====
+  { id:'p2_start', cond:g=>g.phase>=2 && !g.thoughtFlags.p2_start, text:"Brian isn't alone anymore. People actually want to be around him. And they're starting to talk.", type:'event' },
+  { id:'first_rep', cond:g=>g.reputation>=1 && !g.thoughtFlags.first_rep, text:"Reputation. It's like Charisma, but it travels without you. People know Brian before he walks into the room.", type:'thought' },
+  { id:'first_routine', cond:g=>Object.keys(g.routines).length>=1 && !g.thoughtFlags.first_routine, text:"Brian built a routine. It costs something — a piece of his capacity — but it runs itself now. Is this growth or surrender?", type:'thought' },
+  { id:'routine3', cond:g=>Object.keys(g.routines).length>=3 && !g.thoughtFlags.routine3, text:"Three routines. Brian's life is a machine now. Efficient. Relentless. He has less energy for spontaneity, but the output... the output is impressive.", type:'thought' },
+  { id:'energy_budget', cond:g=>g.maxEnergy<=50 && g.phase>=2 && !g.thoughtFlags.energy_budget, text:"Brian's energy budget is thin. Every routine carved a piece away. Friends are the only thing keeping the lights on.", type:'thought' },
+  { id:'friends10', cond:g=>totalFriends(g)>=10 && !g.thoughtFlags.friends10, text:"Ten people who know Brian's name. Ten people who'd answer if he called. Brian's phone never stops pinging.", type:'thought' },
+  { id:'friends25', cond:g=>totalFriends(g)>=25 && !g.thoughtFlags.friends25, text:"Twenty-five friends. Brian can't remember all their birthdays. He buys a planner. Then another planner for the planner.", type:'thought' },
+  { id:'friends50', cond:g=>totalFriends(g)>=50 && !g.thoughtFlags.friends50, text:"Fifty friends. Brian throws a party and half the neighborhood shows up. The other half wishes they'd been invited.", type:'thought' },
+  { id:'rep100', cond:g=>g.reputation>=100 && !g.thoughtFlags.rep100, text:"A hundred reputation. Brian is no longer invisible. The barista knows his order.", type:'thought' },
+  { id:'rep500', cond:g=>g.reputation>=500 && !g.thoughtFlags.rep500, text:"People talk about Brian. Not to Brian. About him. In good ways.", type:'thought' },
+  { id:'rep1000', cond:g=>g.reputation>=1000 && !g.thoughtFlags.rep1000, text:"A thousand. Brian's Wikipedia page gets created by someone he's never met. Half of it's wrong. He doesn't correct it.", type:'thought' },
+  { id:'rep3000', cond:g=>g.reputation>=3000 && !g.thoughtFlags.rep3000, text:"Local newspaper wants to interview Brian. 'What's your secret?' they ask. Brian shrugs. He genuinely doesn't know.", type:'thought' },
+  { id:'rep5000', cond:g=>g.reputation>=5000 && !g.thoughtFlags.rep5000, text:"A child asks Brian for an autograph. Brian laughs, then realizes she's serious.", type:'thought' },
+  { id:'rep8000', cond:g=>g.reputation>=8000 && !g.thoughtFlags.rep8000, text:"The mayor called. THE MAYOR. Brian isn't just a person anymore.", type:'thought' },
+  { id:'rep9500', cond:g=>g.reputation>=9500 && !g.thoughtFlags.rep9500, text:"Brian can feel it. He's outgrowing this. Something bigger is coming.", type:'thought' },
+  { id:'friends100', cond:g=>totalFriends(g)>=100 && !g.thoughtFlags.friends100, text:"One hundred friends. Brian needs a spreadsheet. He hates that he needs a spreadsheet. He loves that he needs a spreadsheet.", type:'thought' },
+
+  // ===== Phase 3: Brian Inc. =====
+  { id:'p3_start', cond:g=>g.phase>=3 && !g.thoughtFlags.p3_start, text:"Brian signs the incorporation papers. Brian, Inc. It's real now.", type:'event' },
+  { id:'first_initiative', cond:g=>Object.keys(g.initiatives).length>=1 && g.phase>=3 && !g.thoughtFlags.first_initiative, text:"Brian's first initiative. Influence starts flowing. But the public is watching. They always are.", type:'thought' },
+  { id:'opinion_low', cond:g=>g.publicOpinion<25 && g.phase>=3 && !g.thoughtFlags.opinion_low, text:"The protests outside Brian HQ grow louder. Production stutters. Perhaps Brian pushed too far.", type:'thought' },
+  { id:'opinion_high', cond:g=>g.publicOpinion>80 && g.phase>=3 && !g.thoughtFlags.opinion_high, text:"They love Brian. They LOVE Brian. This is both wonderful and terrifying.", type:'thought' },
+  { id:'opinion_crash', cond:g=>g.publicOpinion<15 && g.phase>=3 && !g.thoughtFlags.opinion_crash, text:"Friends are leaving. The opinion is toxic. Brian's empire is crumbling from within.", type:'thought' },
+  { id:'first_team', cond:g=>g.teamSize>=1 && !g.thoughtFlags.first_team, text:"Brian hires his first team member. Delegation or multiplication? Both. Neither. Something new.", type:'thought' },
+  { id:'team10', cond:g=>g.teamSize>=10 && !g.thoughtFlags.team10, text:"Ten people working for Brian. He holds a meeting. Looks around the table. Built this from coffee and walks.", type:'thought' },
+  { id:'inf100', cond:g=>g.influence>=100 && !g.thoughtFlags.inf100, text:"A hundred influence. Brian can get a table at any restaurant in town. A small power, but his.", type:'thought' },
+  { id:'inf1000', cond:g=>g.influence>=1000 && !g.thoughtFlags.inf1000, text:"A thousand influence. Brian's name opens doors he didn't know existed.", type:'thought' },
+  { id:'inf10000', cond:g=>g.influence>=10000 && !g.thoughtFlags.inf10000, text:"Brian reads about himself in the news. Third person. 'Brian is reshaping the world.'", type:'thought' },
+  { id:'inf50000', cond:g=>g.influence>=50000 && !g.thoughtFlags.inf50000, text:"Brian's team reports something strange in the data. Patterns that shouldn't exist.", type:'thought' },
+  { id:'inf100000', cond:g=>g.influence>=100000 && !g.thoughtFlags.inf100000, text:"One hundred thousand influence. Brian's decisions move markets. His sneeze crashes stock prices.", type:'thought' },
+  { id:'inf500000', cond:g=>g.influence>=500000 && !g.thoughtFlags.inf500000, text:"Half a million. Brian sits alone in a room that costs more per night than his first apartment cost per year. The coffee tastes the same.", type:'thought' },
+  { id:'strange', cond:g=>g.flags.strangeResearch && !g.thoughtFlags.strange, text:"The lab results are in. Reality itself responds to Brian's influence. What does that mean?", type:'thought' },
+  { id:'anomalous', cond:g=>g.flags.anomalousFindings && !g.thoughtFlags.anomalous, text:"The data doesn't lie. Something is listening. Something is watching. Something is waiting.", type:'cosmic' },
+  { id:'protocol', cond:g=>g.flags.protocolReady && !g.thoughtFlags.protocol, text:"'Are you sure about this, Brian?' asks the lead scientist. Brian nods.", type:'thought' },
+  { id:'board5', cond:g=>g.stats.boardMeetings>=5 && !g.thoughtFlags.board5, text:"Another board meeting. Brian has learned that every decision is a trade: opinion for influence, influence for power, power for loneliness.", type:'thought' },
+  { id:'inf1m', cond:g=>g.influence>=1000000 && !g.thoughtFlags.inf1m, text:"Brian looks at the button. THE button. There's no going back.", type:'event' },
+
+  // ===== Phase 4: The Unraveling =====
+  { id:'p4_start', cond:g=>g.phase>=4 && !g.thoughtFlags.p4_start, text:"Everything Brian built is dissolving. Not breaking — dissolving. Like sugar in rain. But from the dissolution, something new crystallizes.", type:'event' },
+  { id:'first_wisdom', cond:g=>g.wisdom>=1 && !g.thoughtFlags.first_wisdom, text:"Wisdom tastes like copper and starlight. It's made from loss.", type:'thought' },
+  { id:'first_decay', cond:g=>g.phase>=4 && g.stats.totalTimePlayed>g._p4StartTime+5 && !g.thoughtFlags.first_decay, text:"The numbers are going down. Everything Brian built, unmade. But from the unmade — Wisdom. The cost of knowing is losing.", type:'thought' },
+  { id:'first_remember', cond:g=>Object.keys(g.remembers).length>=1 && !g.thoughtFlags.first_remember, text:"Brian holds on. It costs him — Wisdom spent to slow the bleeding. But some things are worth remembering.", type:'thought' },
+  { id:'wisdom10', cond:g=>g.wisdom>=10 && !g.thoughtFlags.wisdom10, text:"Brian remembers being small. Coffee. Friends. It seems so distant.", type:'thought' },
+  { id:'wisdom25', cond:g=>g.wisdom>=25 && !g.thoughtFlags.wisdom25, text:"Brian reads the Library of Congress in a picosecond. Most of it is tax code. This is the funniest thing he's ever experienced.", type:'thought' },
+  { id:'wisdom50', cond:g=>g.wisdom>=50 && !g.thoughtFlags.wisdom50, text:"Fifty wisdom. Brian can hear colors and taste mathematics. Pi is cinnamon. Euler's number is umami.", type:'thought' },
+  { id:'wisdom100', cond:g=>g.wisdom>=100 && !g.thoughtFlags.wisdom100, text:"Brian can count every atom in the solar system. He does. For fun.", type:'thought' },
+  { id:'first_reality', cond:g=>g.realityProjects.perceive && !g.thoughtFlags.first_reality, text:"Brian perceives the multiverse for the first time. It's quieter than expected. And there are so many of him.", type:'cosmic' },
+  { id:'reality_fold', cond:g=>g.realityProjects.fold && !g.thoughtFlags.reality_fold, text:"Spacetime folds like origami under Brian's will. He makes a crane. Then unmakes it. Then makes it again, but better.", type:'cosmic' },
+  { id:'wisdom500', cond:g=>g.wisdom>=500 && !g.thoughtFlags.wisdom500, text:"Five hundred wisdom. Brian understands the joke the universe is telling. He doesn't laugh. It's not that kind of joke.", type:'cosmic' },
+  { id:'reality_rewrite', cond:g=>g.realityProjects.rewrite && !g.thoughtFlags.reality_rewrite, text:"Brian rewrites the laws of physics. Gravity now has a sense of humor. Light bends toward interesting conversations.", type:'cosmic' },
+  { id:'wisdom1000', cond:g=>g.wisdom>=1000 && !g.thoughtFlags.wisdom1000, text:"The universe has a name, Brian realizes. It's Brian.", type:'cosmic' },
+  { id:'equation', cond:g=>g.flags.equationSolved && !g.thoughtFlags.equation, text:"There it is. The equation that ties everything together. B = everything.", type:'cosmic' },
+  { id:'wisdom5000', cond:g=>g.wisdom>=5000 && !g.thoughtFlags.wisdom5000, text:"Five thousand wisdom. Brian has forgotten more than civilizations have learned. He tries to remember his mother's face. He can. That's enough.", type:'cosmic' },
+  { id:'humanity_yes', cond:g=>g.flags.humanity===true && g.wisdom>=200 && !g.thoughtFlags.humanity_yes, text:"Brian still remembers the taste of coffee. That matters.", type:'thought' },
+  { id:'humanity_no', cond:g=>g.flags.humanity===false && g.wisdom>=200 && !g.thoughtFlags.humanity_no, text:"What was coffee? Brian can't recall. It doesn't matter.", type:'thought' },
+  { id:'consumed', cond:g=>g.flags.consumed && !g.thoughtFlags.consumed, text:"Brian is everything. Everything is Brian. In the silence between atoms, Brian hears his own heartbeat. Or is it the universe's?", type:'cosmic' },
+
+  // ===== Meta Thoughts =====
+  { id:'meta_10min', cond:g=>g.stats.totalTimePlayed>=600 && !g.thoughtFlags.meta_10min, text:"Ten minutes. Brian has been at this for ten minutes. In the real world, someone is watching Brian. Brian tries not to think about that.", type:'thought' },
+  { id:'meta_30min', cond:g=>g.stats.totalTimePlayed>=1800 && !g.thoughtFlags.meta_30min, text:"Half an hour of being Brian. The line between player and played grows thinner. Who is clicking whom?", type:'thought' },
+  { id:'meta_1hr', cond:g=>g.stats.totalTimePlayed>=3600 && !g.thoughtFlags.meta_1hr, text:"One hour. Brian wonders if this is what it feels like to be a character in someone else's story.", type:'thought' },
+  { id:'meta_2hr', cond:g=>g.stats.totalTimePlayed>=7200 && !g.thoughtFlags.meta_2hr, text:"Two hours. Brian is grateful. Not everyone gets this much attention. Most NPCs are walked past. Brian is walked with.", type:'thought' },
+
+  // ===== Easter Eggs =====
+  { id:'click100', cond:g=>g.stats.clicks>=100 && !g.thoughtFlags.click100, text:"One hundred clicks. Somewhere, a mouse weeps. Brian presses on.", type:'thought' },
+  { id:'click500', cond:g=>g.stats.clicks>=500 && !g.thoughtFlags.click500, text:"Five hundred clicks. Brian's index finger has developed its own personality. It is ambitious and relentless.", type:'thought' },
+  { id:'click1000', cond:g=>g.stats.clicks>=1000 && !g.thoughtFlags.click1000, text:"A thousand clicks. The sound of a mouse button is the heartbeat of a digital god.", type:'thought' },
+  { id:'gym50', cond:g=>g.stats.gymClicks>=50 && !g.thoughtFlags.gym50, text:"Fifty gym sessions. Brian could benchpress his former self. Literally and metaphorically.", type:'thought' },
+  { id:'alien_contact', cond:g=>g.flags.alienContact && !g.thoughtFlags.alien_contact, text:"They know Brian's name. Across the void, in languages that predate light, something whispers: Brian. Brian. Brian.", type:'cosmic' },
+  { id:'board10', cond:g=>g.stats.boardMeetings>=10 && !g.thoughtFlags.board10, text:"Ten board meetings survived. Brian has learned the art of the meaningful nod, the strategic pause, the power of saying nothing loudly.", type:'thought' },
+  { id:'friends_mentors5', cond:g=>(g.friends.mentors||0)>=5 && !g.thoughtFlags.friends_mentors5, text:"Five mentors. Brian collects wise people the way some collect stamps. Each one a world. Each one a warning.", type:'thought' },
+];
+
+// =========================================================================
+// GAME STATE
+// =========================================================================
+
+function getDefaultState() {
+  return {
+    phase: 1, tick: 0, totalTicks: 0,
+    lastSave: Date.now(), lastOnline: Date.now(), startTime: Date.now(),
+    // Phase 1
+    cp: 0, totalCp: 0,
+    energy: 100, maxEnergy: 100, energyRegen: BASE_ENERGY_REGEN,
+    automation: { rate: 0, targetAction: 'be_brian', progress: 0 },
+    comboWindowBonus: 0,
+    comboThresholdMult: 1,
+    comboMultStrength: 1,
+    comboGain: 1,
+    clickBonus: 0, globalCpMult: 1, clickCpMult: 1, passiveCpMult: 1,
+    bonusCpPerSec: 0,
+    // Phase 2
+    reputation: 0, totalReputation: 0,
+    friends: { acquaintances:0, close:0, best:0, mentors:0 },
+    friendCostMult: { acquaintances:1, close:1, best:1, mentors:1 },
+    friendRegenMult: { acquaintances:1, close:1, best:1, mentors:1 },
+    friendRepMult: { acquaintances:1, close:1, best:1, mentors:1 },
+    globalFriendRegenMult: 1,
+    repMult: 1, bonusRepPerSec: 0,
+    routines: {}, // { routineId: true }
+    routineTimers: {}, // { routineId: timerValue }
+    // Phase 3
+    influence: 0, totalInfluence: 0,
+    publicOpinion: 50,
+    initiatives: {}, // { initiativeId: true }
+    initiativeCostMult: 1,
+    teamSize: 0,
+    infMult: 1,
+    opinionDriftMult: 1, opinionGainMult: 1, opinionLossMult: 1,
+    boardTimer: 60, boardMeetingActive: false,
+    // Phase 4
+    wisdom: 0, totalWisdom: 0,
+    wisdomGainMult: 1,
+    decayMult: 1,
+    remembers: {}, // { rememberId: true }
+    _p4StartTime: 0,
+    // Meta
+    upgrades: {},
+    projects: {},
+    realityProjects: {},
+    messages: [],
+    thoughtFlags: {},
+    flags: { humanity: null },
+    stats: { actions:0, clicks:0, gymClicks:0, totalTimePlayed:0, boardMeetings:0 },
+  };
+}
+
+let game = getDefaultState();
+
+// =========================================================================
+// UTILITY FUNCTIONS
+// =========================================================================
+
+function addMsg(text, type='thought') {
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  game.messages.push({ text, type, time: timeStr });
+  if (game.messages.length > 200) game.messages.shift();
+  renderMessages();
+}
+
+function totalFriends(g) {
+  return (g.friends.acquaintances||0)+(g.friends.close||0)+(g.friends.best||0)+(g.friends.mentors||0);
+}
+
+function clampOpinion() {
+  if (game.flags.opinionLocked) { game.publicOpinion = 50; return; }
+  game.publicOpinion = Math.max(0, Math.min(100, game.publicOpinion));
+}
+
+function getAutomationConfig() {
+  const actionIds = [];
+  let maxRate = 0;
+  for (const tier of AUTOMATION_TIER_UPGRADES) {
+    if (!game.upgrades[tier.upgradeId]) continue;
+    actionIds.push(...tier.actionIds);
+    maxRate = tier.maxRate;
+  }
+  return {
+    unlocked: actionIds.length > 0,
+    actionIds: [...new Set(actionIds)],
+    maxRate,
+  };
+}
+
+function getAutomationActionChoices() {
+  const config = getAutomationConfig();
+  return ACTIONS.filter(a =>
+    config.actionIds.includes(a.id) &&
+    a.phase <= game.phase &&
+    (a.phase > 1 || game.totalCp >= a.unlockTotalCp)
+  );
+}
+
+function sanitizeAutomationState() {
+  const config = getAutomationConfig();
+  if (!config.unlocked) {
+    game.automation.rate = 0;
+    game.automation.progress = 0;
+    game.automation.targetAction = 'be_brian';
+    return config;
+  }
+
+  const choices = getAutomationActionChoices();
+  if (!choices.length) {
+    game.automation.rate = 0;
+    game.automation.progress = 0;
+    return config;
+  }
+
+  if (!choices.some(a => a.id === game.automation.targetAction)) {
+    game.automation.targetAction = choices[0].id;
+    game.automation.progress = 0;
+  }
+  game.automation.rate = Math.max(0, Math.min(game.automation.rate || 0, config.maxRate));
+  return config;
+}
+
+// =========================================================================
+// FLOATING NUMBERS
+// =========================================================================
+
+function spawnFloatNum(text, x, y, cls='') {
+  const el = document.createElement('div');
+  el.className = 'float-num' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+// =========================================================================
+// CLICK COMBO SYSTEM
+// =========================================================================
+
+let comboCount = 0;
+let comboTimer = 0;
+let comboDecayInterval = null;
+const BASE_COMBO_WINDOW = 2; // seconds
+const COMBO_THRESHOLDS = [
+  { clicks: 5, mult: 1.2, label: 'x1.2' },
+  { clicks: 15, mult: 1.5, label: 'x1.5' },
+  { clicks: 30, mult: 2.0, label: 'x2.0' },
+  { clicks: 50, mult: 3.0, label: 'x3.0 FRENZY' },
+];
+
+function getComboWindow() {
+  return BASE_COMBO_WINDOW + game.comboWindowBonus;
+}
+
+function getComboThresholds() {
+  return COMBO_THRESHOLDS.map((tier, idx) => {
+    const mult = tier.mult * game.comboMultStrength;
+    const suffix = idx === COMBO_THRESHOLDS.length - 1 ? ' FRENZY' : '';
+    return {
+      clicks: Math.max(3, Math.ceil(tier.clicks * game.comboThresholdMult)),
+      mult,
+      label: `x${mult.toFixed(2)}${suffix}`,
+    };
+  });
+}
+
+function getActiveComboTier() {
+  let active = null;
+  for (const t of getComboThresholds()) {
+    if (comboCount >= t.clicks) active = t;
+  }
+  return active;
+}
+
+function getComboMult() {
+  let mult = 1;
+  for (const t of getComboThresholds()) {
+    if (comboCount >= t.clicks) mult = t.mult;
+  }
+  return mult;
+}
+
+function registerComboClick() {
+  comboCount += game.comboGain;
+  comboTimer = getComboWindow();
+  updateComboDisplay();
+}
+
+function updateComboDisplay() {
+  const el = document.getElementById('combo-indicator');
+  const activeTier = getActiveComboTier();
+  if (activeTier) {
+    el.textContent = `COMBO ${comboCount} ${activeTier.label}`;
+    el.classList.add('active');
+  } else if (comboCount >= 3) {
+    el.textContent = `${comboCount} clicks...`;
+    el.classList.add('active');
+  } else {
+    el.classList.remove('active');
+  }
+}
+
+function tickCombo(dt) {
+  if (comboCount > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) {
+      comboCount = Math.max(0, comboCount - 3);
+      comboTimer = Math.max(0.5, getComboWindow() * 0.25);
+      updateComboDisplay();
+    }
+  }
+}
+
+// =========================================================================
+// BULK BUY
+// =========================================================================
+
+let bulkBuyAmount = 1; // 1, 10, or -1 for max
+
+function getBulkFriendCost(typeId, amount) {
+  const ft = FRIEND_TYPES.find(f=>f.id===typeId);
+  let total = 0;
+  const base = game.friends[typeId] || 0;
+  const costMult = game.friendCostMult[typeId] || 1;
+  for (let i = 0; i < amount; i++) {
+    total += ft.baseCost * Math.pow(ft.growth, base + i) * costMult;
+  }
+  return total;
+}
+
+function getMaxFriends(typeId) {
+  const ft = FRIEND_TYPES.find(f=>f.id===typeId);
+  let count = 0;
+  let total = 0;
+  const base = game.friends[typeId] || 0;
+  const costMult = game.friendCostMult[typeId] || 1;
+  while (total + ft.baseCost * Math.pow(ft.growth, base + count) * costMult <= game.cp && count < 1000) {
+    total += ft.baseCost * Math.pow(ft.growth, base + count) * costMult;
+    count++;
+  }
+  return count;
+}
+
+function buyFriendBulk(typeId) {
+  let amount = bulkBuyAmount;
+  if (amount === -1) amount = getMaxFriends(typeId);
+  if (amount <= 0) return;
+  const cost = getBulkFriendCost(typeId, amount);
+  if (game.cp < cost) return;
+  game.cp -= cost;
+  game.friends[typeId] += amount;
+}
+
+// =========================================================================
+// NEXT MILESTONE
+// =========================================================================
+
+function getNextMilestone() {
+  if (game.phase === 1) {
+    const milestones = [
+      { val: 20, label: 'Make Coffee unlocks' },
+      { val: 25, label: 'Friends panel unlocks' },
+      { val: 75, label: 'Go for a Walk unlocks' },
+      { val: 200, label: 'Talk to Someone unlocks' },
+      { val: 500, label: 'Go to Work unlocks' },
+      { val: 1000, label: 'Read a Book unlocks' },
+      { val: 2000, label: 'Cook a Nice Meal unlocks' },
+      { val: 4000, label: 'Hit the Gym unlocks' },
+      { val: 8000, label: 'Attend a Meetup unlocks' },
+      { val: 10000, label: 'Host a Dinner Party unlocks' },
+      { val: 12000, label: 'Give a Talk unlocks' },
+      { val: 14000, label: 'Throw a Big Event unlocks' },
+      { val: 15000, label: 'Phase 2' },
+    ];
+    for (const m of milestones) {
+      if (game.totalCp < m.val) return `Next at ${fmt(m.val)} total CP: ${m.label}`;
+    }
+  }
+  if (game.phase === 2) {
+    const milestones = [
+      { val: 150, label: 'Brian Projects unlock', res: 'rep' },
+      { val: 200, label: 'First project choice', res: 'rep' },
+      { val: 10000, label: 'Phase 3', res: 'rep' },
+    ];
+    for (const m of milestones) {
+      if (game.reputation < m.val) return `Next at ${fmt(m.val)} Rep: ${m.label}`;
+    }
+  }
+  if (game.phase === 3) {
+    if (!game.flags.strangeResearch) return 'Launch Strange Research initiative to progress';
+    if (!game.flags.anomalousFindings) return 'Purchase Anomalous Findings upgrade';
+    if (!game.flags.protocolReady) return 'Acquire The Brian Protocol';
+    if (game.influence < 1000000) return `Need ${fmt(1000000)} Influence for transcendence`;
+    return 'Initiate Brian Transcendence';
+  }
+  if (game.phase === 4) {
+    const nextRP = REALITY_PROJECTS.find(rp => !game.realityProjects[rp.id] && (!rp.prereq || game.realityProjects[rp.prereq]) && (!rp.unlockFn || rp.unlockFn(game)));
+    if (nextRP) return `Next: ${nextRP.name} [${fmt(nextRP.cost)} Wisdom]`;
+  }
+  return '';
+}
+
+// =========================================================================
+// RESOURCE TREND TRACKING
+// =========================================================================
+
+let prevResources = { cp: 0, reputation: 0, influence: 0, wisdom: 0 };
+let resourceTrends = { cp: 'flat', reputation: 'flat', influence: 'flat', wisdom: 'flat' };
+
+function updateTrends() {
+  for (const key of ['cp', 'reputation', 'influence', 'wisdom']) {
+    const curr = game[key];
+    const prev = prevResources[key];
+    if (curr > prev + 0.1) resourceTrends[key] = 'up';
+    else if (curr < prev - 0.1) resourceTrends[key] = 'down';
+    else resourceTrends[key] = 'flat';
+    prevResources[key] = curr;
+  }
+}
+
+function trendArrow(key) {
+  const t = resourceTrends[key];
+  if (t === 'up') return '<span class="trend-up">\u25B2</span>';
+  if (t === 'down') return '<span class="trend-down">\u25BC</span>';
+  return '';
+}
+
+function getPlaytimeProgressMult() {
+  return 1 + Math.min(1.5, game.stats.totalTimePlayed / 3600);
+}
+
+// =========================================================================
+// GAME MECHANICS
+// =========================================================================
+
+function getCpPerSec() {
+  let cps = 0;
+  // Friends cpPerSec (currently 0 for all types - user removed this)
+  for (const ft of FRIEND_TYPES) {
+    const count = game.friends[ft.id] || 0;
+    cps += count * ft.cpPerSec;
+  }
+  cps *= game.passiveCpMult * game.globalCpMult;
+  cps += game.bonusCpPerSec * game.globalCpMult;
+  return cps * getPlaytimeProgressMult();
+}
+
+function getRepPerSec() {
+  if (game.phase < 2) return 0;
+  let rps = 0;
+  // Friends generate Rep/s in Phase 2+
+  for (const ft of FRIEND_TYPES) {
+    const count = game.friends[ft.id] || 0;
+    rps += count * ft.repPerSec * (game.friendRepMult[ft.id] || 1);
+  }
+  // Team members generate Rep/s
+  rps += game.teamSize * 1;
+  rps *= game.repMult;
+  rps += game.bonusRepPerSec;
+  return rps * getPlaytimeProgressMult();
+}
+
+function getInfPerSec() {
+  if (game.phase < 3) return 0;
+  let ips = 0;
+  // Initiatives
+  for (const init of INITIATIVES) {
+    if (game.initiatives[init.id]) {
+      ips += init.infPerSec;
+    }
+  }
+  // Team members
+  ips += game.teamSize * 0.5;
+  // Opinion multiplier
+  let opMult = 1;
+  if (game.publicOpinion >= 70) opMult = 1.5;
+  else if (game.publicOpinion >= 40) opMult = 1;
+  else if (game.publicOpinion >= 30) opMult = 0.5;
+  else opMult = 0.2;
+  ips *= opMult;
+  ips *= game.infMult;
+  return ips * getPlaytimeProgressMult();
+}
+
+function getWisdomPerSec() {
+  if (game.phase < 4) return 0;
+  // Wisdom comes from resource decay
+  let wps = 0;
+  const decayRate = 0.01 * game.decayMult; // 1%/s base
+  // CP decay → Wisdom
+  const cpDecayRate = game.flags.slowCpDecay ? decayRate * 0.5 : decayRate;
+  wps += game.cp * cpDecayRate / 1000;
+  // Rep decay → Wisdom
+  const repDecayRate = game.flags.slowRepDecay ? decayRate * 0.5 : decayRate;
+  wps += game.reputation * repDecayRate / 100;
+  // Inf decay → Wisdom
+  const infDecayRate = game.flags.slowInfDecay ? decayRate * 0.5 : decayRate;
+  wps += game.influence * infDecayRate / 10;
+  wps *= game.wisdomGainMult;
+  return wps * getPlaytimeProgressMult();
+}
+
+function getTotalEnergyRegen() {
+  let friendRegen = 0;
+  for (const ft of FRIEND_TYPES) {
+    const count = game.friends[ft.id] || 0;
+    friendRegen += count * ft.energyRegen * (game.friendRegenMult[ft.id] || 1);
+  }
+  return (game.energyRegen + friendRegen * game.globalFriendRegenMult) * getPlaytimeProgressMult();
+}
+
+function getFriendCost(typeId) {
+  const ft = FRIEND_TYPES.find(f=>f.id===typeId);
+  const count = game.friends[typeId] || 0;
+  return ft.baseCost * Math.pow(ft.growth, count) * (game.friendCostMult[typeId] || 1);
+}
+
+function getTeamCost() {
+  return 100 * Math.pow(1.5, game.teamSize);
+}
+
+function getActionCpGain(action) {
+  let gain = action.cpGain + game.clickBonus;
+  gain *= game.clickCpMult * game.globalCpMult * getPlaytimeProgressMult();
+  let energyCost = Math.ceil(action.energyCost);
+  return { cp: gain, energy: energyCost, rep: 0, wisdom: (action.wisdomGain || 0) * getPlaytimeProgressMult() };
+}
+
+// =========================================================================
+// ACTION HANDLERS
+// =========================================================================
+
+function resolveAction(actionId, opts = {}) {
+  const { e = null, countAsClick = true, useCombo = true, showFloat = true } = opts;
+  const action = findAction(actionId);
+  if (!action) return false;
+  const result = getActionCpGain(action);
+  if (game.energy < result.energy) return false;
+
+  if (useCombo) registerComboClick();
+  const combo = useCombo ? getComboMult() : 1;
+
+  game.energy -= result.energy;
+  if (result.cp > 0) {
+    const cp = result.cp * combo;
+    game.cp += cp;
+    game.totalCp += cp;
+    if (showFloat) {
+      const x = (e ? e.clientX : 200) + (Math.random() * 40 - 20);
+      const y = (e ? e.clientY : 200) - 10;
+      spawnFloatNum('+' + fmt(cp) + ' CP', x, y);
+    }
+  }
+  if (result.wisdom > 0) {
+    const w = result.wisdom * game.wisdomGainMult * combo;
+    game.wisdom += w;
+    game.totalWisdom += w;
+    if (showFloat) {
+      const x = (e ? e.clientX : 200) + (Math.random() * 40 - 20);
+      const y = (e ? e.clientY : 200) - 10;
+      spawnFloatNum('+' + w.toFixed(2) + ' W', x, y, 'wisdom');
+    }
+  }
+  game.stats.actions++;
+  if (countAsClick) game.stats.clicks++;
+  if (actionId === 'gym' && countAsClick) game.stats.gymClicks++;
+  return true;
+}
+
+function performAction(actionId, e) {
+  return resolveAction(actionId, { e });
+}
+
+function tickAutomation(dt) {
+  const config = sanitizeAutomationState();
+  if (!config.unlocked || game.automation.rate <= 0) return;
+  game.automation.progress += dt * game.automation.rate;
+  while (game.automation.progress >= 1) {
+    game.automation.progress -= 1;
+    resolveAction(game.automation.targetAction, {
+      countAsClick: false,
+      useCombo: false,
+      showFloat: false,
+    });
+  }
+}
+
+function buyFriend(typeId) {
+  const cost = getFriendCost(typeId);
+  if (game.cp < cost) return;
+  game.cp -= cost;
+  game.friends[typeId]++;
+}
+
+function buyRoutine(routineId) {
+  const r = ROUTINES.find(x=>x.id===routineId);
+  if (!r || game.routines[routineId]) return;
+  if (game.cp < r.cost) return;
+  game.cp -= r.cost;
+  game.routines[routineId] = true;
+  game.routineTimers[routineId] = 0;
+  game.maxEnergy -= r.energyDrain;
+  if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+  addMsg(`Routine established: ${r.name} (-${r.energyDrain} max energy)`, 'event');
+}
+
+function buyInitiative(initId) {
+  const init = INITIATIVES.find(x=>x.id===initId);
+  if (!init || game.initiatives[initId]) return;
+  if (game.reputation < init.cost * game.initiativeCostMult) return;
+  game.reputation -= init.cost * game.initiativeCostMult;
+  game.initiatives[initId] = true;
+  // Opinion effect
+  if (game.flags.freeInitiatives && game.flags.freeInitiatives > 0) {
+    game.flags.freeInitiatives--;
+  } else if (!game.flags.opinionLocked) {
+    game.publicOpinion += init.opinionDelta;
+    clampOpinion();
+  }
+  if (init.flag) game.flags[init.flag] = true;
+  addMsg(`Initiative launched: ${init.name}`, 'event');
+}
+
+function buyTeamMember() {
+  const cost = getTeamCost();
+  if (game.influence < cost) return;
+  game.influence -= cost;
+  game.teamSize++;
+}
+
+function buyUpgrade(upgradeId) {
+  const u = UPGRADES.find(x=>x.id===upgradeId);
+  if (!u || game.upgrades[upgradeId]) return;
+  const currency = u.currency === 'influence' ? game.influence : game.cp;
+  if (currency < u.cost) return;
+  if (u.currency === 'influence') game.influence -= u.cost;
+  else game.cp -= u.cost;
+  game.upgrades[upgradeId] = true;
+  u.effect(game);
+  sanitizeAutomationState();
+  addMsg(`Upgrade purchased: ${u.name}`, 'event');
+}
+
+function chooseProject(projectId, choice) {
+  const p = PROJECTS.find(x=>x.id===projectId);
+  if (!p || game.projects[projectId] !== undefined) return;
+  game.projects[projectId] = choice;
+  const opt = choice === 'a' ? p.a : p.b;
+  opt.effect(game);
+  addMsg(`Brian chose: ${opt.name} - ${opt.desc}`, 'project');
+}
+
+function buyRemember(remId) {
+  const r = REMEMBER.find(x=>x.id===remId);
+  if (!r || game.remembers[remId]) return;
+  if (game.wisdom < r.cost) return;
+  game.wisdom -= r.cost;
+  game.remembers[remId] = true;
+  game.flags[r.flag] = true;
+  addMsg(`Brian remembers: ${r.name}`, 'cosmic');
+}
+
+function buyRealityProject(rpId) {
+  const rp = REALITY_PROJECTS.find(x=>x.id===rpId);
+  if (!rp || game.realityProjects[rpId]) return;
+  if (rp.prereq && !game.realityProjects[rp.prereq]) return;
+  if (rp.unlockFn && !rp.unlockFn(game)) return;
+  if (game.wisdom < rp.cost) return;
+  game.wisdom -= rp.cost;
+  game.realityProjects[rpId] = true;
+  rp.effect(game);
+  addMsg(`Reality Project complete: ${rp.name}`, 'cosmic');
+}
+
+// =========================================================================
+// PHASE TRANSITIONS
+// =========================================================================
+
+const PHASE_NAMES = {
+  1: 'Phase 1: Just Brian',
+  2: 'Phase 2: Rising Brian',
+  3: 'Phase 3: Brian Inc.',
+  4: 'Phase 4: The Unraveling',
+  5: 'Phase 5: The End'
+};
+
+const PHASE_SUBTITLES = {
+  1: 'just a regular guy',
+  2: 'becoming someone',
+  3: 'building an empire',
+  4: 'letting go',
+  5: 'everything'
+};
+
+function checkPhaseTransitions() {
+  if (game.phase === 1 && game.totalCp >= 15000) {
+    game.phase = 2;
+    addMsg("Brian has become someone people want to be around. A new chapter begins.", 'event');
+    updatePhaseUI();
+    flashPhaseTransition();
+  }
+  if (game.phase === 2 && game.reputation >= 10000) {
+    game.phase = 3;
+    if (game.flags.startOpinion70) game.publicOpinion = 70;
+    addMsg("Brian's influence can no longer be contained in a social circle. It's time to build something bigger.", 'event');
+    updatePhaseUI();
+    flashPhaseTransition();
+  }
+  if (game.phase === 3 && game.influence >= 1000000 && game.flags.protocolReady && !game.flags.transcendButtonShown) {
+    game.flags.transcendButtonShown = true;
+    addMsg("The Brian Protocol is ready. A button appears.", 'event');
+  }
+}
+
+function initiateTranscendence() {
+  if (game.phase !== 3) return;
+  game.phase = 4;
+  game._p4StartTime = game.stats.totalTimePlayed;
+  flashPhaseTransition();
+  const lines = [
+    "Brian presses the button.",
+    "The machines whir to life.",
+    "Reality... shimmers.",
+    "Everything Brian built begins to dissolve.",
+    "But from the dissolution — something new.",
+    "Wisdom. Made from loss."
+  ];
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < lines.length) { addMsg(lines[i], 'cosmic'); i++; }
+    else { clearInterval(interval); updatePhaseUI(); }
+  }, 1000);
+}
+
+function updatePhaseUI() {
+  document.body.className = 'phase-' + game.phase;
+  document.getElementById('phase-label').textContent = PHASE_NAMES[game.phase] || '';
+  document.getElementById('phase-subtitle').textContent = PHASE_SUBTITLES[game.phase] || '';
+  updateProgressBar();
+}
+
+function flashPhaseTransition() {
+  const el = document.getElementById('phase-flash');
+  el.classList.remove('flash');
+  void el.offsetWidth; // force reflow
+  el.classList.add('flash');
+}
+
+// Milestone-based panel unlocks
+const PANEL_UNLOCKS = [
+  { panel: 'panel-friends', cond: g => g.totalCp >= 25 },
+  { panel: 'panel-routines', cond: g => g.phase >= 2 },
+  { panel: 'panel-projects', cond: g => g.phase >= 2 && g.reputation >= 150 },
+  { panel: 'panel-initiatives', cond: g => g.phase >= 3 },
+  { panel: 'panel-team', cond: g => g.phase >= 3 && g.influence >= 50 },
+  { panel: 'panel-opinion', cond: g => g.phase >= 3 && g.influence >= 10 },
+  { panel: 'panel-decay', cond: g => g.phase >= 4 },
+  { panel: 'panel-remember', cond: g => g.phase >= 4 && g.wisdom >= 5 },
+  { panel: 'panel-reality', cond: g => g.phase >= 4 && g.wisdom >= 20 },
+];
+
+const _unlockedPanels = new Set();
+
+function checkPanelUnlocks() {
+  for (const pu of PANEL_UNLOCKS) {
+    if (_unlockedPanels.has(pu.panel)) continue;
+    try {
+      if (pu.cond(game)) {
+        _unlockedPanels.add(pu.panel);
+        const el = document.getElementById(pu.panel);
+        if (el) {
+          el.classList.remove('panel-locked');
+          el.classList.add('panel-new');
+          const h2 = el.querySelector('h2');
+          if (h2 && !h2.querySelector('.new-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'new-badge';
+            badge.textContent = 'NEW';
+            h2.appendChild(badge);
+            setTimeout(() => { if (badge.parentNode) badge.remove(); }, 4500);
+          }
+          el.addEventListener('animationend', () => el.classList.remove('panel-new'), { once: true });
+        }
+      }
+    } catch(e) {}
+  }
+}
+
+function updateProgressBar() {
+  const phaseBase = (game.phase - 1) * 20;
+  let phaseProgress = 0;
+
+  if (game.phase === 1) {
+    phaseProgress = Math.min(1, game.totalCp / 15000);
+  } else if (game.phase === 2) {
+    phaseProgress = Math.min(1, game.reputation / 10000);
+  } else if (game.phase === 3) {
+    const needInf = game.influence >= 1000000 && game.flags.protocolReady;
+    phaseProgress = needInf ? 1 : Math.min(0.95, game.influence / 1000000);
+  } else if (game.phase === 4) {
+    phaseProgress = Math.min(1, game.wisdom / 20000);
+  } else if (game.phase === 5) {
+    phaseProgress = 1;
+  }
+
+  const pct = phaseBase + phaseProgress * 20;
+  document.getElementById('game-progress-fill').style.width = pct + '%';
+}
+
+// =========================================================================
+// BOARD MEETINGS
+// =========================================================================
+
+let boardTimeout = null;
+
+function triggerBoardMeeting() {
+  if (game.phase < 3 || game.phase >= 4 || game.boardMeetingActive) return;
+  game.boardTimer = 60 + Math.random() * 30;
+
+  // Tier ramp: first 2 meetings = tier 1 only, 3-4 = tier 1-2, 5+ = all tiers
+  const maxTier = game.stats.boardMeetings < 2 ? 1 : game.stats.boardMeetings < 4 ? 2 : 3;
+  const eligible = BOARD_MEETINGS.filter(m => {
+    if (m.unlockFn && !m.unlockFn(game)) return false;
+    if (m.tier && m.tier > maxTier) return false;
+    return true;
+  });
+  if (eligible.length === 0) return;
+
+  const meeting = eligible[Math.floor(Math.random() * eligible.length)];
+  game.boardMeetingActive = true;
+  game.stats.boardMeetings++;
+
+  document.getElementById('board-situation').textContent = meeting.situation;
+  document.getElementById('board-opt-a').innerHTML = `<b>${meeting.a.name}</b><br>${meeting.a.desc}`;
+  document.getElementById('board-opt-b').innerHTML = `<b>${meeting.b.name}</b><br>${meeting.b.desc}`;
+
+  const modal = document.getElementById('board-modal');
+  modal.classList.remove('modal-hidden');
+
+  let timeLeft = 30;
+  document.getElementById('board-timer').textContent = `Auto-deciding in ${timeLeft}s...`;
+
+  const resolve = (choice) => {
+    clearTimeout(boardTimeout);
+    clearInterval(countdownInterval);
+    modal.classList.add('modal-hidden');
+    game.boardMeetingActive = false;
+    const opt = choice === 'a' ? meeting.a : meeting.b;
+    opt.effect(game);
+    clampOpinion();
+    addMsg(`Board Meeting: ${meeting.situation} → ${opt.name}`, 'board');
+  };
+
+  document.getElementById('board-opt-a').onclick = () => resolve('a');
+  document.getElementById('board-opt-b').onclick = () => resolve('b');
+
+  const countdownInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById('board-timer').textContent = `Auto-deciding in ${timeLeft}s...`;
+    if (timeLeft <= 0) clearInterval(countdownInterval);
+  }, 1000);
+
+  boardTimeout = setTimeout(() => {
+    resolve(Math.random() < 0.5 ? 'a' : 'b');
+  }, 30000);
+}
+
+// =========================================================================
+// ENDING
+// =========================================================================
+
+function triggerEnding() {
+  game.phase = 5;
+  updatePhaseUI();
+
+  const overlay = document.getElementById('ending-overlay');
+  const content = document.getElementById('ending-content');
+  const choices = document.getElementById('ending-choices');
+  overlay.classList.remove('modal-hidden');
+  content.innerHTML = '';
+  choices.innerHTML = '';
+
+  const lines = [
+    "Brian has consumed everything.",
+    "There is nothing left but Brian.",
+    "In the silence, Brian contemplates.",
+    "What now?"
+  ];
+
+  lines.forEach((line, i) => {
+    const el = document.createElement('div');
+    el.className = 'ending-line';
+    el.textContent = line;
+    content.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), (i + 1) * 2000);
+  });
+
+  setTimeout(() => {
+    // Ending A: Compassionate Return (requires humanity)
+    if (game.flags.humanity === true || game.flags.rememberHumanity) {
+      const btn = document.createElement('button');
+      btn.textContent = 'The Compassionate Return';
+      btn.onclick = () => showEnding('A');
+      choices.appendChild(btn);
+    }
+    // Ending B: Absolute Brian (requires no humanity)
+    if (game.flags.humanity === false || (!game.flags.rememberHumanity && game.flags.humanity !== true)) {
+      const btn = document.createElement('button');
+      btn.textContent = 'The Absolute Brian';
+      btn.onclick = () => showEnding('B');
+      choices.appendChild(btn);
+    }
+    // Ending C: The Question (requires alien contact)
+    if (game.flags.endingC || game.flags.alienContact) {
+      const btn = document.createElement('button');
+      btn.textContent = 'The Question';
+      btn.onclick = () => showEnding('C');
+      choices.appendChild(btn);
+    }
+    // Ending D: The Loop (always available)
+    const loopBtn = document.createElement('button');
+    loopBtn.textContent = 'The Loop';
+    loopBtn.onclick = () => showEnding('D');
+    choices.appendChild(loopBtn);
+  }, lines.length * 2000 + 1000);
+}
+
+function showEnding(ending) {
+  const content = document.getElementById('ending-content');
+  const choices = document.getElementById('ending-choices');
+  content.innerHTML = '';
+  choices.innerHTML = '';
+
+  let lines = [];
+
+  if (ending === 'A') {
+    lines = [
+      "Brian releases everything back.",
+      "The universe reforms, but better. Kinder. More Brian-like.",
+      "People wake up feeling inexplicably good. They don't know why.",
+      "Brian is just a person again. But the coffee tastes better now.",
+      "And somehow, that's enough.",
+      "",
+      "THE COMPASSIONATE RETURN"
+    ];
+  } else if (ending === 'B') {
+    lines = [
+      "Brian becomes the universe.",
+      "Every atom is Brian. Every thought is Brian.",
+      "There is no distinction between Brian and everything else.",
+      "B = mc\u00B2. B = E. B = everything. B = B.",
+      "In the silence of totality, Brian smiles.",
+      "",
+      "THE ABSOLUTE BRIAN"
+    ];
+  } else if (ending === 'C') {
+    lines = [
+      "Brian reaches out beyond the universe. Something reaches back.",
+      "'Are you Brian too?' Brian asks.",
+      "'No,' it replies. 'I'm something else entirely. But I've been watching.'",
+      "'What happens now?' Brian asks.",
+      "'Now? Now we talk. For as long as you like.'",
+      "",
+      "THE QUESTION"
+    ];
+  } else if (ending === 'D') {
+    lines = [
+      "Brian closes his eyes.",
+      "When he opens them, he's sitting at a desk.",
+      "There's a coffee machine. There's a window.",
+      "He has a simple thought: just... be Brian.",
+      "Wait. Hasn't this happened before?",
+      "...",
+      "Brian wakes up.",
+      "",
+      "THE LOOP"
+    ];
+  }
+
+  lines.forEach((line, i) => {
+    const el = document.createElement('div');
+    el.className = 'ending-line';
+    el.textContent = line;
+    el.style.fontSize = i === lines.length - 1 ? '24px' : '16px';
+    content.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), (i + 1) * 2000);
+  });
+
+  // Stats + thank you
+  setTimeout(() => {
+    const statsEl = document.createElement('div');
+    statsEl.style.cssText = 'margin-top:20px;font-size:13px;color:#888;line-height:2;';
+    statsEl.innerHTML = `
+      Total Charisma earned: ${fmt(game.totalCp)}<br>
+      Total Reputation: ${fmt(game.totalReputation)}<br>
+      Total Influence: ${fmt(game.totalInfluence)}<br>
+      Total Wisdom: ${fmt(game.totalWisdom)}<br>
+      Friends made: ${fmt(totalFriends(game))}<br>
+      Actions taken: ${fmt(game.stats.actions)}<br>
+      Routines established: ${Object.keys(game.routines).length}<br>
+      Initiatives launched: ${Object.keys(game.initiatives).length}<br>
+      Memories preserved: ${Object.keys(game.remembers).length}<br>
+      Time played: ${fmtTime(game.stats.totalTimePlayed)}<br>
+      <br>
+      <b>Thank you for being Brian.</b>
+    `;
+    statsEl.className = 'ending-line';
+    content.appendChild(statsEl);
+    setTimeout(() => statsEl.classList.add('visible'), 500);
+  }, lines.length * 2000 + 2000);
+}
+
+// =========================================================================
+// THOUGHTS CHECKER
+// =========================================================================
+
+function checkThoughts() {
+  for (const t of THOUGHTS) {
+    if (game.thoughtFlags[t.id]) continue;
+    try {
+      if (t.cond(game)) {
+        game.thoughtFlags[t.id] = true;
+        addMsg(t.text, t.type || 'thought');
+      }
+    } catch(e) {}
+  }
+}
+
+// =========================================================================
+// UI RENDERING
+// =========================================================================
+
+function renderMessages() {
+  const log = document.getElementById('message-log');
+  let html = '';
+  const msgs = game.messages.slice(-80);
+  for (const m of msgs) {
+    html += `<div class="msg msg-${m.type}"><span class="msg-time">${m.time||''}</span>${m.text}</div>`;
+  }
+  log.innerHTML = html;
+  log.scrollTop = log.scrollHeight;
+}
+
+const ACTION_KEYS = ['Q','W','E','R','T','Y','U','I','O','P','A','S','D'];
+
+function renderActions() {
+  const list = document.getElementById('actions-list');
+  let html = '';
+  let keyIdx = 0;
+  const combo = getComboMult();
+  const activeComboTier = getActiveComboTier();
+  const comboNote = activeComboTier ? ` <span style="color:#5a5;font-size:10px;">COMBO ${activeComboTier.label}</span>` : '';
+  const automationConfig = sanitizeAutomationState();
+  const automationChoices = getAutomationActionChoices();
+  if (automationConfig.unlocked && automationChoices.length) {
+    const rateLabel = game.automation.rate > 0 ? `${game.automation.rate.toFixed(1)}/s` : 'Paused';
+    html += `<div class="automation-box">
+      <div class="automation-title">
+        <span>Auto Brian</span>
+        <span class="automation-rate">${rateLabel}</span>
+      </div>
+      <div class="automation-row">
+        <span>Target</span>
+        <span>${automationConfig.maxRate.toFixed(1)}/s cap</span>
+      </div>
+      <select class="automation-select" onchange="setAutomationTarget(this.value)">
+        ${automationChoices.map(a => `<option value="${a.id}" ${a.id===game.automation.targetAction?'selected':''}>${a.name}</option>`).join('')}
+      </select>
+      <div class="automation-row">
+        <span>Rate</span>
+        <span>${game.automation.rate.toFixed(1)} actions/s</span>
+      </div>
+      <input class="automation-slider" type="range" min="0" max="${automationConfig.maxRate}" step="0.5" value="${game.automation.rate}" oninput="setAutomationRate(this.value)">
+      <div class="automation-note">Uses normal energy and follows normal action costs. Auto Brian never builds combo.</div>
+    </div>`;
+  }
+  if (comboNote) html += `<div style="font-size:11px;color:#4a4;margin-bottom:2px;">Combo active: ${activeComboTier?.label||''}</div>`;
+  for (const a of ACTIONS) {
+    if (a.phase > game.phase) continue;
+    if (a.phase <= 1 && game.totalCp < a.unlockTotalCp) continue;
+    const result = getActionCpGain(a);
+    const canDo = game.energy >= result.energy;
+    const keyHint = keyIdx < ACTION_KEYS.length ? `<span class="key-hint">[${ACTION_KEYS[keyIdx]}]</span>` : '';
+    keyIdx++;
+    let gainText = '';
+    if (result.cp > 0) {
+      const effective = combo > 1 ? fmt(result.cp * combo) : fmt(result.cp);
+      gainText += ` +${effective} Charisma`;
+    }
+    if (result.wisdom > 0) gainText += ` +${result.wisdom} Wisdom`;
+    html += `<button class="action-btn" onclick="performAction('${a.id}', event)" ${canDo?'':' disabled'}>
+      <b>${a.name}</b>${keyHint}
+      <span class="cost"> [${result.energy} energy]</span>
+      <span class="gain">${gainText}</span>
+      <span style="color:#555;font-size:10px;display:block;">${a.desc}</span>
+    </button>`;
+  }
+  if (game.phase === 3 && game.flags.transcendButtonShown) {
+    html += `<button class="transcend-btn" onclick="initiateTranscendence()">Initiate Brian Transcendence</button>`;
+  }
+  list.innerHTML = html;
+}
+
+function renderUpgrades() {
+  const list = document.getElementById('upgrades-list');
+  let html = '';
+  let visibleCount = 0;
+  for (const u of UPGRADES) {
+    if (u.phase > game.phase) continue;
+    if (game.upgrades[u.id]) continue;
+    try { if (!u.unlockFn(game)) continue; } catch(e) { continue; }
+    const currency = u.currency === 'influence' ? game.influence : game.cp;
+    const affordable = currency >= u.cost;
+    const currLabel = u.currency === 'influence' ? 'Inf' : 'Charisma';
+    visibleCount++;
+    html += `<button class="upgrade-btn${affordable?' affordable':''}" onclick="buyUpgrade('${u.id}')" ${affordable?'':' disabled'}>
+      <b>${u.name}</b> <span class="u-cost">[${fmt(u.cost)} ${currLabel}]</span>
+      <span class="u-desc">${u.desc}</span>
+    </button>`;
+  }
+  const purchasedCount = Object.keys(game.upgrades).length;
+  const totalCount = UPGRADES.length;
+  if (purchasedCount > 0) {
+    html = `<div style="color:#555;font-size:10px;margin-bottom:4px;">${purchasedCount}/${totalCount} purchased</div>` + html;
+  }
+  if (visibleCount === 0 && purchasedCount > 0) {
+    html += '<div style="color:#999;font-size:11px;padding:4px;">No upgrades available right now.</div>';
+  }
+  list.innerHTML = html;
+}
+
+function renderRoutines() {
+  if (game.phase < 2) return;
+  const list = document.getElementById('routines-list');
+  let html = '';
+  // Show active routines
+  const activeCount = Object.keys(game.routines).length;
+  if (activeCount > 0) {
+    html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Active routines: ${activeCount} | Energy budget: -${Object.keys(game.routines).reduce((sum, rid) => {
+      const r = ROUTINES.find(x=>x.id===rid);
+      return sum + (r ? r.energyDrain : 0);
+    }, 0)} max energy</div>`;
+  }
+  for (const r of ROUTINES) {
+    if (game.routines[r.id]) {
+      html += `<button class="routine-btn active" disabled>
+        <b>${r.name}</b> <span style="color:#4a4;">ACTIVE</span>
+        <span class="r-desc">Auto: ${findAction(r.actionId)?.name} every ${r.interval}s</span>
+      </button>`;
+      continue;
+    }
+    try { if (!r.unlockFn(game)) continue; } catch(e) { continue; }
+    const affordable = game.cp >= r.cost;
+    html += `<button class="routine-btn${affordable?' affordable':''}" onclick="buyRoutine('${r.id}')" ${affordable?'':' disabled'}>
+      <b>${r.name}</b> <span class="r-cost">[${fmt(r.cost)} Charisma]</span>
+      <span class="r-desc">Auto: ${findAction(r.actionId)?.name} every ${r.interval}s | Costs ${r.energyDrain} max energy permanently</span>
+    </button>`;
+  }
+  list.innerHTML = html;
+}
+
+function renderProjects() {
+  const list = document.getElementById('projects-list');
+  if (game.phase < 2) return;
+  let html = '';
+  for (const p of PROJECTS) {
+    if (p.phase > game.phase) continue;
+    if (game.projects[p.id] !== undefined) {
+      const chosen = game.projects[p.id] === 'a' ? p.a : p.b;
+      html += `<div class="project-chosen">Project ${p.id}: <b>${chosen.name}</b></div>`;
+      continue;
+    }
+    try { if (!p.unlockFn(game)) continue; } catch(e) { continue; }
+    html += `<div class="project-choice">
+      <button class="project-btn" onclick="chooseProject(${p.id},'a')">
+        <span class="p-name">${p.a.name}</span><span class="p-desc">${p.a.desc}</span>
+      </button>
+      <button class="project-btn" onclick="chooseProject(${p.id},'b')">
+        <span class="p-name">${p.b.name}</span><span class="p-desc">${p.b.desc}</span>
+      </button>
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+function renderResources() {
+  const el = document.getElementById('resource-display');
+  let html = '';
+  // Energy
+  const ePct = (game.energy / game.maxEnergy * 100).toFixed(0);
+  const eColor = ePct > 50 ? '#4a4' : ePct > 20 ? '#aa4' : '#a44';
+  const totalERegen = getTotalEnergyRegen();
+  html += `<div class="res-line"><span class="res-label">Energy:</span> <span class="res-val">${Math.floor(game.energy)}</span>/<span>${game.maxEnergy}</span> <span class="res-rate">(+${totalERegen.toFixed(1)}/s)</span></div>`;
+  html += `<div class="energy-bar-wrap"><div class="energy-bar-fill" style="width:${ePct}%;background:${eColor};"></div></div>`;
+  // CP
+  const cpps = getCpPerSec();
+  let cpDecayNote = '';
+  if (game.phase >= 4) {
+    const decayRate = 0.01 * game.decayMult * (game.flags.slowCpDecay ? 0.5 : 1);
+    cpDecayNote = ` <span style="color:#a44;">(-${(decayRate*100).toFixed(1)}%/s)</span>`;
+  }
+  html += `<div class="res-line"><span class="res-label">Charisma:</span> <span class="res-val">${fmt(game.cp)}</span> ${trendArrow('cp')}${cpps>0?' <span class="res-rate">(+'+fmt(cpps)+'/s)</span>':''}${cpDecayNote}</div>`;
+  // Phase 2+
+  if (game.phase >= 2) {
+    const rps = getRepPerSec();
+    let repDecayNote = '';
+    if (game.phase >= 4) {
+      const decayRate = 0.01 * game.decayMult * (game.flags.slowRepDecay ? 0.5 : 1);
+      repDecayNote = ` <span style="color:#a44;">(-${(decayRate*100).toFixed(1)}%/s)</span>`;
+    }
+    html += `<div class="res-line"><span class="res-label">Reputation:</span> <span class="res-val">${fmt(game.reputation)}</span> ${trendArrow('reputation')}${rps>0?' <span class="res-rate">(+'+fmt(rps)+'/s)</span>':''}${repDecayNote}</div>`;
+  }
+  // Phase 3+
+  if (game.phase >= 3) {
+    const ips = getInfPerSec();
+    let infDecayNote = '';
+    if (game.phase >= 4) {
+      const decayRate = 0.01 * game.decayMult * (game.flags.slowInfDecay ? 0.5 : 1);
+      infDecayNote = ` <span style="color:#a44;">(-${(decayRate*100).toFixed(1)}%/s)</span>`;
+    }
+    html += `<div class="res-line"><span class="res-label">Influence:</span> <span class="res-val">${fmt(game.influence)}</span> ${trendArrow('influence')}${ips>0?' <span class="res-rate">(+'+fmt(ips)+'/s)</span>':''}${infDecayNote}</div>`;
+  }
+  // Phase 4+
+  if (game.phase >= 4) {
+    const wps = getWisdomPerSec();
+    html += `<div class="res-line"><span class="res-label">Wisdom:</span> <span class="res-val">${fmt(game.wisdom)}</span> ${trendArrow('wisdom')}${wps>0?' <span class="res-rate">(+'+fmt(wps)+'/s)</span>':''}</div>`;
+  }
+  // Friends count
+  const tf = totalFriends(game);
+  if (tf > 0 || game.phase >= 2) {
+    html += `<div class="res-line" style="margin-top:4px;"><span class="res-label">Friends:</span> <span class="res-val">${fmt(tf)}</span></div>`;
+  }
+  // Team
+  if (game.teamSize > 0) {
+    html += `<div class="res-line"><span class="res-label">Team:</span> <span class="res-val">${game.teamSize}</span></div>`;
+  }
+  // Next milestone hint
+  const milestone = getNextMilestone();
+  if (milestone) {
+    html += `<div class="milestone-hint">${milestone}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderFriends() {
+  const el = document.getElementById('friends-display');
+  if (!el) return;
+  let html = '';
+  const total = totalFriends(game);
+  html += `<div class="res-line" style="font-size:14px;margin-bottom:4px;"><b>Total Friends: ${total}</b></div>`;
+  // Bulk buy toggle
+  html += `<div class="bulk-toggle">
+    <button class="${bulkBuyAmount===1?'active':''}" onclick="bulkBuyAmount=1">x1</button>
+    <button class="${bulkBuyAmount===10?'active':''}" onclick="bulkBuyAmount=10">x10</button>
+    <button class="${bulkBuyAmount===-1?'active':''}" onclick="bulkBuyAmount=-1">Max</button>
+  </div>`;
+  // Only acquaintances in Phase 1
+  const availableTypes = game.phase >= 2 ? FRIEND_TYPES : FRIEND_TYPES.slice(0, 1);
+  availableTypes.forEach((ft, idx) => {
+    const count = game.friends[ft.id] || 0;
+    let buyAmt = bulkBuyAmount === -1 ? getMaxFriends(ft.id) : bulkBuyAmount;
+    const cost = buyAmt > 0 ? getBulkFriendCost(ft.id, buyAmt) : Infinity;
+    const affordable = game.cp >= cost && buyAmt > 0;
+    const energyBonus = count * ft.energyRegen * (game.friendRegenMult[ft.id] || 1) * game.globalFriendRegenMult;
+    const repBonus = game.phase >= 2 ? count * ft.repPerSec * (game.friendRepMult[ft.id] || 1) : 0;
+    const keyHint = `<span class="key-hint">[${idx+1}]</span>`;
+    const buyLabel = bulkBuyAmount === -1 ? (buyAmt > 0 ? `Buy ${buyAmt}` : 'Buy') : `Buy${buyAmt>1?' '+buyAmt:''}`;
+    html += `<div style="margin:4px 0;">
+      <b>${ft.name}s:</b> ${count}
+      ${energyBonus > 0 ? `<span class="res-rate" style="color:#4a4;">(+${energyBonus.toFixed(2)} energy/s)</span>` : ''}
+      ${repBonus > 0 ? `<span class="res-rate" style="color:#88a;">(+${repBonus.toFixed(2)} rep/s)</span>` : ''}
+      <button class="friend-btn${affordable?' affordable':''}" onclick="buyFriendBulk('${ft.id}')" ${affordable?'':' disabled'}>
+        ${buyLabel} [${fmt(cost)} Charisma] ${keyHint}
+      </button>
+    </div>`;
+  });
+  // Phase 4 friend loss warning
+  if (game.phase >= 4 && !game.flags.stopFriendLoss && !game.flags.compassionatePath && total > 0) {
+    html += `<div style="color:#a44;font-size:11px;margin-top:4px;">Friends are fading... (-1 every 30s)</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderInitiatives() {
+  if (game.phase < 3) return;
+  const el = document.getElementById('initiatives-display');
+  let html = '';
+  const activeInf = INITIATIVES.reduce((sum, init) => sum + (game.initiatives[init.id] ? init.infPerSec : 0), 0);
+  if (activeInf > 0) {
+    html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Active initiatives: +${activeInf} Inf/s base</div>`;
+  }
+  for (const init of INITIATIVES) {
+    if (game.initiatives[init.id]) {
+      html += `<button class="initiative-btn purchased" disabled>
+        <b>${init.name}</b> <span style="color:#4a4;">ACTIVE</span>
+        <br><span style="color:#666;font-size:11px;">${init.desc}</span>
+      </button>`;
+      continue;
+    }
+    const cost = init.cost * game.initiativeCostMult;
+    const affordable = game.reputation >= cost;
+    html += `<button class="initiative-btn${affordable?' affordable':''}" onclick="buyInitiative('${init.id}')" ${affordable?'':' disabled'}>
+      <b>${init.name}</b> <span style="color:#666;font-size:11px;">[${fmt(cost)} Rep]</span>
+      <br><span style="color:#666;font-size:11px;">${init.desc}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderTeam() {
+  if (game.phase < 3) return;
+  const el = document.getElementById('team-display');
+  const cost = getTeamCost();
+  const affordable = game.influence >= cost;
+  let html = `<div class="res-line" style="margin-bottom:4px;">
+    <b>Team Size:</b> ${game.teamSize}
+    <span class="res-rate">(+${game.teamSize} Rep/s, +${(game.teamSize*0.5).toFixed(1)} Inf/s)</span>
+  </div>`;
+  html += `<button class="team-btn${affordable?' affordable':''}" onclick="buyTeamMember()" ${affordable?'':' disabled'}>
+    Hire [${fmt(cost)} Inf]
+  </button>`;
+  el.innerHTML = html;
+}
+
+function renderOpinion() {
+  if (game.phase < 3) return;
+  const el = document.getElementById('opinion-display');
+  const op = Math.round(game.publicOpinion);
+  let color = '#4a4';
+  if (op < 15) color = '#a22';
+  else if (op < 30) color = '#a44';
+  else if (op < 40) color = '#a84';
+  else if (op < 70) color = '#aa4';
+  else color = '#4a4';
+  let effectText = '';
+  if (game.flags.opinionLocked) effectText = 'Locked at 50';
+  else if (op >= 70) effectText = 'Beloved (+50% production)';
+  else if (op >= 40) effectText = 'Acceptable (normal)';
+  else if (op >= 30) effectText = 'Controversial (-50% Influence)';
+  else if (op >= 15) effectText = 'Despised (-80% Influence)';
+  else effectText = 'CRISIS: Friends leaving!';
+  el.innerHTML = `
+    <div class="opinion-bar-wrap">
+      <div class="opinion-bar-fill" style="width:${op}%;background:${color};"></div>
+      <span class="opinion-label">${op}/100</span>
+    </div>
+    <div style="font-size:11px;color:#666;margin-top:2px;">${effectText}</div>
+  `;
+}
+
+function renderDecay() {
+  if (game.phase < 4) return;
+  const el = document.getElementById('decay-display');
+  let html = '<div style="font-size:12px;color:#a88;margin-bottom:6px;">Everything dissolves. Loss becomes Wisdom.</div>';
+  const baseDecay = (0.01 * game.decayMult * 100).toFixed(1);
+  html += `<div style="font-size:11px;color:#666;">Base decay rate: ${baseDecay}%/s</div>`;
+  // Show what's decaying
+  if (game.cp > 0) {
+    const rate = game.flags.slowCpDecay ? 'slowed' : 'active';
+    html += `<div style="font-size:11px;color:#888;">Charisma: <span style="color:${game.flags.slowCpDecay?'#aa8':'#a44'};">${rate}</span></div>`;
+  }
+  if (game.reputation > 0) {
+    const rate = game.flags.slowRepDecay ? 'slowed' : 'active';
+    html += `<div style="font-size:11px;color:#888;">Reputation: <span style="color:${game.flags.slowRepDecay?'#aa8':'#a44'};">${rate}</span></div>`;
+  }
+  if (game.influence > 0) {
+    const rate = game.flags.slowInfDecay ? 'slowed' : 'active';
+    html += `<div style="font-size:11px;color:#888;">Influence: <span style="color:${game.flags.slowInfDecay?'#aa8':'#a44'};">${rate}</span></div>`;
+  }
+  const wps = getWisdomPerSec();
+  if (wps > 0) {
+    html += `<div style="font-size:12px;color:#a8a;margin-top:4px;">Wisdom from decay: +${fmt(wps)}/s</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderRemember() {
+  if (game.phase < 4) return;
+  const el = document.getElementById('remember-display');
+  let html = '<div style="font-size:11px;color:#888;margin-bottom:6px;">Spend Wisdom to hold on to what matters.</div>';
+  for (const r of REMEMBER) {
+    if (game.remembers[r.id]) {
+      html += `<button class="remember-btn purchased" disabled>
+        <b>${r.name}</b> <span style="color:#aa8;">REMEMBERED</span>
+        <br><span style="color:#666;font-size:11px;">${r.desc}</span>
+      </button>`;
+      continue;
+    }
+    const affordable = game.wisdom >= r.cost;
+    html += `<button class="remember-btn${affordable?' affordable':''}" onclick="buyRemember('${r.id}')" ${affordable?'':' disabled'}>
+      <b>${r.name}</b> <span style="color:#666;font-size:11px;">[${fmt(r.cost)} Wisdom]</span>
+      <br><span style="color:#666;font-size:11px;">${r.desc}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderRealityProjects() {
+  if (game.phase < 4) return;
+  const el = document.getElementById('reality-display');
+  let html = '';
+  for (const rp of REALITY_PROJECTS) {
+    if (rp.unlockFn && !rp.unlockFn(game) && !game.realityProjects[rp.id]) continue;
+    if (rp.prereq && !game.realityProjects[rp.prereq]) continue;
+    if (game.realityProjects[rp.id]) {
+      html += `<button class="reality-btn purchased" disabled>${rp.name} <span style="color:#999;font-size:11px;">- ${rp.desc}</span></button>`;
+      continue;
+    }
+    const affordable = game.wisdom >= rp.cost;
+    html += `<button class="reality-btn${affordable?' affordable':''}" onclick="buyRealityProject('${rp.id}')" ${affordable?'':' disabled'}>
+      <b>${rp.name}</b> <span class="r-cost">[${fmt(rp.cost)} Wisdom]</span>
+      <br><span style="color:#666;font-size:11px;">${rp.desc}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-display');
+  el.innerHTML = `
+    <div>Total Charisma earned: ${fmt(game.totalCp)}</div>
+    <div>Total Reputation: ${fmt(game.totalReputation)}</div>
+    ${game.phase>=3?'<div>Total Influence: '+fmt(game.totalInfluence)+'</div>':''}
+    ${game.phase>=4?'<div>Total Wisdom: '+fmt(game.totalWisdom)+'</div>':''}
+    <div>Momentum: x${getPlaytimeProgressMult().toFixed(2)}</div>
+    <div>Actions taken: ${game.stats.actions}</div>
+    <div>Friends: ${totalFriends(game)}</div>
+    ${game.phase>=2?'<div>Routines: '+Object.keys(game.routines).length+'</div>':''}
+    ${game.phase>=3?'<div>Initiatives: '+Object.keys(game.initiatives).length+'</div>':''}
+    ${game.phase>=3?'<div>Team size: '+game.teamSize+'</div>':''}
+    ${game.phase>=3?'<div>Board meetings: '+game.stats.boardMeetings+'</div>':''}
+    ${game.phase>=4?'<div>Memories preserved: '+Object.keys(game.remembers).length+'</div>':''}
+    <div>Time played: ${fmtTime(game.stats.totalTimePlayed)}</div>
+  `;
+}
+
+function updateUI() {
+  renderResources();
+  renderActions();
+  renderUpgrades();
+  renderRoutines();
+  renderProjects();
+  renderFriends();
+  renderInitiatives();
+  renderTeam();
+  renderOpinion();
+  renderDecay();
+  renderRemember();
+  renderRealityProjects();
+  renderStats();
+  updateProgressBar();
+  document.getElementById('time-played').textContent = fmtTime(game.stats.totalTimePlayed);
+}
+
+// =========================================================================
+// GAME LOOP
+// =========================================================================
+
+const TICK_MS = 100;
+let lastTick = Date.now();
+let uiCounter = 0;
+let saveCounter = 0;
+let friendLossTimer = 0;
+
+function gameTick() {
+  const now = Date.now();
+  const dt = Math.min((now - lastTick) / 1000, 1);
+  lastTick = now;
+  game.tick++;
+  game.totalTicks++;
+  game.stats.totalTimePlayed += dt;
+
+  // Energy regen (base from upgrades + friends = the core loop)
+  const totalERegen = getTotalEnergyRegen();
+  game.energy = Math.min(game.maxEnergy, game.energy + totalERegen * dt);
+
+  // Passive Charisma from friends (currently 0 for all types)
+  const cpGain = getCpPerSec() * dt;
+  if (cpGain > 0) {
+    game.cp += cpGain;
+    game.totalCp += cpGain;
+  }
+
+  tickAutomation(dt);
+
+  // Phase 2+: Rep generation from friends
+  if (game.phase >= 2) {
+    const repGain = getRepPerSec() * dt;
+    game.reputation += repGain;
+    game.totalReputation += repGain;
+  }
+
+  // Phase 2+: Routine auto-actions
+  if (game.phase >= 2) {
+    for (const r of ROUTINES) {
+      if (!game.routines[r.id]) continue;
+      game.routineTimers[r.id] = (game.routineTimers[r.id] || 0) + dt;
+      if (game.routineTimers[r.id] >= r.interval) {
+        game.routineTimers[r.id] = 0;
+        const action = findAction(r.actionId);
+        if (action) {
+          const result = getActionCpGain(action);
+          // Routines don't cost energy (the permanent drain was the cost)
+          if (result.cp > 0) {
+            game.cp += result.cp;
+            game.totalCp += result.cp;
+          }
+          game.stats.actions++;
+        }
+      }
+    }
+  }
+
+  // Phase 3+
+  if (game.phase >= 3 && game.phase < 5) {
+    const infGain = getInfPerSec() * dt;
+    game.influence += infGain;
+    game.totalInfluence += infGain;
+
+    // Opinion drift toward 50
+    if (!game.flags.opinionLocked) {
+      let target = 50;
+      if (game.flags.benevolent) game.publicOpinion += 1 * dt * game.opinionGainMult;
+      if (game.flags.ruthless) game.publicOpinion -= 0.5 * dt * game.opinionLossMult;
+      const drift = (target - game.publicOpinion) * 0.02 * game.opinionDriftMult * dt;
+      game.publicOpinion += drift;
+      clampOpinion();
+
+      // Opinion consequences: friend loss below 15
+      if (game.publicOpinion < 15 && game.phase === 3) {
+        friendLossTimer += dt;
+        if (friendLossTimer >= 30) {
+          friendLossTimer = 0;
+          // Lose a random friend
+          const types = ['acquaintances','close','best','mentors'].filter(t => game.friends[t] > 0);
+          if (types.length > 0) {
+            const t = types[Math.floor(Math.random() * types.length)];
+            game.friends[t]--;
+            addMsg("A friend quietly stops returning Brian's calls.", 'thought');
+          }
+        }
+      }
+    }
+
+    // Board meeting timer
+    if (game.phase === 3) {
+      game.boardTimer -= dt;
+      if (game.boardTimer <= 0 && !game.boardMeetingActive) {
+        triggerBoardMeeting();
+      }
+    }
+
+    // Auto-convert flags
+    if (game.flags.autoConvertCpRep && game.cp > 10000) {
+      const convert = game.cp * 0.01 * dt;
+      game.cp -= convert;
+      game.reputation += convert * 0.1;
+      game.totalReputation += convert * 0.1;
+    }
+    if (game.flags.autoConvertRepInf && game.reputation > 10000) {
+      const convert = game.reputation * 0.01 * dt;
+      game.reputation -= convert;
+      game.influence += convert * 0.01;
+      game.totalInfluence += convert * 0.01;
+    }
+  }
+
+  // Phase 4+: The Unraveling
+  if (game.phase >= 4 && game.phase < 5) {
+    const baseDecay = 0.01 * game.decayMult * dt; // 1%/s base
+
+    // CP decay
+    const cpDecay = game.cp * baseDecay * (game.flags.slowCpDecay ? 0.5 : 1);
+    if (cpDecay > 0) game.cp = Math.max(0, game.cp - cpDecay);
+
+    // Rep decay
+    const repDecay = game.reputation * baseDecay * (game.flags.slowRepDecay ? 0.5 : 1);
+    if (repDecay > 0) game.reputation = Math.max(0, game.reputation - repDecay);
+
+    // Inf decay
+    const infDecay = game.influence * baseDecay * (game.flags.slowInfDecay ? 0.5 : 1);
+    if (infDecay > 0) game.influence = Math.max(0, game.influence - infDecay);
+
+    // Wisdom from decay
+    const wGain = getWisdomPerSec() * dt;
+    game.wisdom += wGain;
+    game.totalWisdom += wGain;
+
+    // Friend loss in Phase 4 (unless remembered/compassionate)
+    if (!game.flags.stopFriendLoss && !game.flags.compassionatePath) {
+      friendLossTimer += dt;
+      if (friendLossTimer >= 30) {
+        friendLossTimer = 0;
+        const types = ['acquaintances','close','best','mentors'].filter(t => game.friends[t] > 0);
+        if (types.length > 0) {
+          const t = types[Math.floor(Math.random() * types.length)];
+          game.friends[t]--;
+        }
+      }
+    }
+  }
+
+  // Combo decay
+  tickCombo(dt);
+
+  // Check transitions, panel unlocks & thoughts
+  checkPhaseTransitions();
+  checkPanelUnlocks();
+  if (game.tick % 5 === 0) checkThoughts();
+
+  // UI update (throttled ~3x/sec)
+  uiCounter += dt;
+  if (uiCounter >= 0.33) {
+    uiCounter = 0;
+    updateTrends();
+    updateUI();
+  }
+
+  // Auto-save every 30s
+  saveCounter += dt;
+  if (saveCounter >= 30) {
+    saveCounter = 0;
+    saveGame(true);
+  }
+}
+
+// =========================================================================
+// SAVE / LOAD
+// =========================================================================
+
+function saveGame(silent) {
+  game.lastSave = Date.now();
+  game.lastOnline = Date.now();
+  try {
+    localStorage.setItem('brianSimulator', JSON.stringify(game));
+    if (!silent) addMsg("Game saved.", 'system');
+  } catch(e) {
+    if (!silent) addMsg("Save failed: " + e.message, 'system');
+  }
+}
+
+function rebuildDerivedState() {
+  let regenFromUpgrades = BASE_ENERGY_REGEN;
+  if (game.upgrades.p1_energy2) regenFromUpgrades += ENERGY_REGEN_BONUSES.p1_energy2;
+  if (game.upgrades.p1_energy3) regenFromUpgrades += ENERGY_REGEN_BONUSES.p1_energy3;
+  if (game.upgrades.p1_energy4) regenFromUpgrades += ENERGY_REGEN_BONUSES.p1_energy4;
+  if (game.projects[4] === 'a') regenFromUpgrades *= 3;
+  if (game.projects[4] === 'b') regenFromUpgrades *= 0.5;
+  game.energyRegen = regenFromUpgrades;
+
+  let maxEnergyFromUpgrades = 100;
+  if (game.upgrades.p1_energy1) maxEnergyFromUpgrades += 25;
+  if (game.upgrades.p1_energy4) maxEnergyFromUpgrades += 50;
+  if (game.upgrades.p2_energy5) maxEnergyFromUpgrades += 100;
+  if (game.projects[4] === 'b') maxEnergyFromUpgrades *= 3;
+  for (const rid of Object.keys(game.routines)) {
+    const r = ROUTINES.find(x=>x.id===rid);
+    if (r) maxEnergyFromUpgrades -= r.energyDrain;
+  }
+  game.maxEnergy = Math.max(10, maxEnergyFromUpgrades);
+  if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+
+  reapplyUpgradeActionEffects();
+  sanitizeAutomationState();
+}
+
+function loadGame() {
+  try {
+    const data = localStorage.getItem('brianSimulator');
+    if (!data) return false;
+    const loaded = JSON.parse(data);
+    const defaults = getDefaultState();
+    // Deep merge for nested objects
+    for (const key of Object.keys(defaults)) {
+      if (loaded[key] === undefined) loaded[key] = defaults[key];
+      else if (typeof defaults[key] === 'object' && !Array.isArray(defaults[key]) && defaults[key] !== null) {
+        loaded[key] = { ...defaults[key], ...loaded[key] };
+      }
+    }
+    Object.assign(game, loaded);
+    rebuildDerivedState();
+
+    // Calculate offline progress
+    const elapsed = (Date.now() - (game.lastOnline || Date.now())) / 1000;
+    if (elapsed > 10) {
+      const capped = Math.min(elapsed, 86400);
+      const efficiency = 0.5;
+      const offCp = getCpPerSec() * capped * efficiency;
+      const offRep = getRepPerSec() * capped * efficiency;
+      const offInf = getInfPerSec() * capped * efficiency;
+      game.cp += offCp;
+      game.totalCp += offCp;
+      game.reputation += offRep;
+      game.totalReputation += offRep;
+      game.influence += offInf;
+      game.totalInfluence += offInf;
+      if (game.phase >= 4) {
+        const offW = getWisdomPerSec() * capped * efficiency;
+        game.wisdom += offW;
+        game.totalWisdom += offW;
+      }
+      addMsg(`Welcome back, Brian. While away for ${fmtTime(capped)}, you earned ${fmt(offCp)} Charisma${offRep>0?', '+fmt(offRep)+' Rep':''}${offInf>0?', '+fmt(offInf)+' Inf':''}.`, 'system');
+    }
+
+    updatePhaseUI();
+    return true;
+  } catch(e) {
+    console.error('Load failed:', e);
+    return false;
+  }
+}
+
+function showExport() {
+  const modal = document.getElementById('io-modal');
+  document.getElementById('io-title').textContent = 'Export Save';
+  document.getElementById('io-text').value = btoa(JSON.stringify(game));
+  document.getElementById('io-action-btn').textContent = 'Copy';
+  document.getElementById('io-action-btn').onclick = () => {
+    navigator.clipboard.writeText(document.getElementById('io-text').value);
+    document.getElementById('io-action-btn').textContent = 'Copied!';
+  };
+  modal.classList.remove('modal-hidden');
+}
+
+function showImport() {
+  const modal = document.getElementById('io-modal');
+  document.getElementById('io-title').textContent = 'Import Save';
+  document.getElementById('io-text').value = '';
+  document.getElementById('io-action-btn').textContent = 'Import';
+  document.getElementById('io-action-btn').onclick = () => {
+    try {
+      const data = JSON.parse(atob(document.getElementById('io-text').value));
+      const defaults = getDefaultState();
+      for (const key of Object.keys(defaults)) {
+        if (data[key] === undefined) data[key] = defaults[key];
+        else if (typeof defaults[key] === 'object' && !Array.isArray(defaults[key]) && defaults[key] !== null) {
+          data[key] = { ...defaults[key], ...data[key] };
+        }
+      }
+      Object.assign(game, data);
+      rebuildDerivedState();
+      updatePhaseUI();
+      modal.classList.add('modal-hidden');
+      addMsg("Save imported successfully.", 'system');
+      saveGame(true);
+    } catch(e) {
+      alert('Invalid save data: ' + e.message);
+    }
+  };
+  modal.classList.remove('modal-hidden');
+}
+
+function resetGame() {
+  if (!confirm("Are you sure? This will erase ALL progress.")) return;
+  if (!confirm("Really? Your mind is made up?")) return;
+  localStorage.removeItem('brianSimulator');
+  game = getDefaultState();
+  location.reload();
+}
+
+// =========================================================================
+// KEYBOARD SHORTCUTS
+// =========================================================================
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!document.getElementById('io-modal').classList.contains('modal-hidden')) return;
+
+  // Board meeting modal: A/B to choose
+  if (!document.getElementById('board-modal').classList.contains('modal-hidden')) {
+    if (e.key === 'a' || e.key === 'A') { document.getElementById('board-opt-a').click(); return; }
+    if (e.key === 'b' || e.key === 'B') { document.getElementById('board-opt-b').click(); return; }
+    return;
+  }
+
+  // Space: perform first available action
+  if (e.code === 'Space') {
+    e.preventDefault();
+    const visible = ACTIONS.filter(a => a.phase <= game.phase && (a.phase > 1 || game.totalCp >= a.unlockTotalCp));
+    for (const a of visible) {
+      const result = getActionCpGain(a);
+      if (game.energy >= result.energy) {
+        performAction(a.id, null);
+        return;
+      }
+    }
+    return;
+  }
+
+  // Q-O: per-action keyboard shortcuts
+  const keyUpper = e.key.toUpperCase();
+  const actionKeyIdx = ACTION_KEYS.indexOf(keyUpper);
+  if (actionKeyIdx >= 0) {
+    const visible = ACTIONS.filter(a => a.phase <= game.phase && (a.phase > 1 || game.totalCp >= a.unlockTotalCp));
+    if (actionKeyIdx < visible.length) {
+      const a = visible[actionKeyIdx];
+      const result = getActionCpGain(a);
+      if (game.energy >= result.energy) {
+        performAction(a.id, null);
+      }
+    }
+    return;
+  }
+
+  // 1-4: buy friend types
+  if (e.key >= '1' && e.key <= '4') {
+    const idx = parseInt(e.key) - 1;
+    const availableTypes = game.phase >= 2 ? FRIEND_TYPES : FRIEND_TYPES.slice(0, 1);
+    if (idx < availableTypes.length) {
+      buyFriendBulk(availableTypes[idx].id);
+    }
+    return;
+  }
+});
+
+// =========================================================================
+// INITIALIZATION
+// =========================================================================
+
+function init() {
+  const loaded = loadGame();
+  if (!loaded) {
+    addMsg("Brian wakes up. He has a simple thought: just... be Brian.", 'thought');
+  }
+  updatePhaseUI();
+  // On load, instantly reveal panels
+  for (const pu of PANEL_UNLOCKS) {
+    try {
+      if (pu.cond(game)) {
+        _unlockedPanels.add(pu.panel);
+        const el = document.getElementById(pu.panel);
+        if (el) el.classList.remove('panel-locked');
+      }
+    } catch(e) {}
+  }
+  updateUI();
+  renderMessages();
+  setInterval(gameTick, TICK_MS);
+}
+
+init();
+</script>
+</body>
+</html>
