@@ -624,17 +624,16 @@ const FRIEND_TYPES = [
 ];
 
 // ---- ROUTINES ----
-// Phase 2 automation: auto-perform actions but permanently reduce max energy
-// The tension: more automation = less energy budget = need more friends
+// Phase 2 automation: auto-perform actions using real energy at a user-controlled rate
 const ROUTINES = [
-  { id:'routine_coffee', name:'Morning Coffee', actionId:'coffee', interval:5, energyDrain:10, cost:200, unlockFn:g=>g.phase>=2 },
-  { id:'routine_walk', name:'Daily Walk', actionId:'walk', interval:4, energyDrain:15, cost:500, unlockFn:g=>g.phase>=2&&g.totalCp>=16000 },
-  { id:'routine_talk', name:'Conversation Practice', actionId:'talk', interval:6, energyDrain:12, cost:800, unlockFn:g=>g.phase>=2&&g.totalCp>=20000 },
-  { id:'routine_work', name:'Work Ethic', actionId:'work', interval:3, energyDrain:20, cost:1500, unlockFn:g=>g.phase>=2&&g.totalCp>=30000 },
-  { id:'routine_read', name:'Reading Habit', actionId:'read', interval:5, energyDrain:15, cost:2000, unlockFn:g=>g.phase>=2&&g.totalCp>=50000 },
-  { id:'routine_cook', name:'Meal Prep', actionId:'cook', interval:4, energyDrain:18, cost:3000, unlockFn:g=>g.phase>=2&&g.totalCp>=80000 },
-  { id:'routine_gym', name:'Gym Routine', actionId:'gym', interval:3, energyDrain:25, cost:5000, unlockFn:g=>g.phase>=2&&g.totalCp>=120000 },
-  { id:'routine_meetup', name:'Social Calendar', actionId:'meetup', interval:4, energyDrain:30, cost:8000, unlockFn:g=>g.phase>=2&&g.totalCp>=180000 },
+  { id:'routine_coffee', name:'Morning Coffee', actionId:'coffee', cost:200, unlockFn:g=>g.phase>=2 },
+  { id:'routine_walk', name:'Daily Walk', actionId:'walk', cost:500, unlockFn:g=>g.phase>=2&&g.totalCp>=16000 },
+  { id:'routine_talk', name:'Conversation Practice', actionId:'talk', cost:800, unlockFn:g=>g.phase>=2&&g.totalCp>=20000 },
+  { id:'routine_work', name:'Work Ethic', actionId:'work', cost:1500, unlockFn:g=>g.phase>=2&&g.totalCp>=30000 },
+  { id:'routine_read', name:'Reading Habit', actionId:'read', cost:2000, unlockFn:g=>g.phase>=2&&g.totalCp>=50000 },
+  { id:'routine_cook', name:'Meal Prep', actionId:'cook', cost:3000, unlockFn:g=>g.phase>=2&&g.totalCp>=80000 },
+  { id:'routine_gym', name:'Gym Routine', actionId:'gym', cost:5000, unlockFn:g=>g.phase>=2&&g.totalCp>=120000 },
+  { id:'routine_meetup', name:'Social Calendar', actionId:'meetup', cost:8000, unlockFn:g=>g.phase>=2&&g.totalCp>=180000 },
 ];
 
 // ---- INITIATIVES ----
@@ -769,6 +768,29 @@ function setAutomationTarget(actionId) {
   if (!choices.some(a => a.id === actionId)) return;
   game.automation.targetAction = actionId;
   game.automation.progress = 0;
+  updateUI();
+}
+
+function getActiveRoutinesSorted() {
+  return ROUTINES
+    .filter(r => game.routines[r.id])
+    .slice()
+    .sort((a, b) => {
+      const actionA = findAction(a.actionId);
+      const actionB = findAction(b.actionId);
+      const costA = actionA ? getActionCpGain(actionA).energy : Infinity;
+      const costB = actionB ? getActionCpGain(actionB).energy : Infinity;
+      if (costA !== costB) return costA - costB;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+function setRoutineRate(value) {
+  game.routineRate = Math.max(0, Math.min(parseFloat(value) || 0, 10));
+  if (game.routineRate === 0) {
+    game.routineProgress = 0;
+    game.routineCursor = 0;
+  }
   updateUI();
 }
 
@@ -913,8 +935,8 @@ const THOUGHTS = [
   // ===== Phase 2: The Reputation Economy =====
   { id:'p2_start', cond:g=>g.phase>=2 && !g.thoughtFlags.p2_start, text:"Brian isn't alone anymore. People actually want to be around him. And they're starting to talk.", type:'event' },
   { id:'first_rep', cond:g=>g.reputation>=1 && !g.thoughtFlags.first_rep, text:"Reputation. It's like Charisma, but it travels without you. People know Brian before he walks into the room.", type:'thought' },
-  { id:'first_routine', cond:g=>Object.keys(g.routines).length>=1 && !g.thoughtFlags.first_routine, text:"Brian built a routine. It costs something — a piece of his capacity — but it runs itself now. Is this growth or surrender?", type:'thought' },
-  { id:'routine3', cond:g=>Object.keys(g.routines).length>=3 && !g.thoughtFlags.routine3, text:"Three routines. Brian's life is a machine now. Efficient. Relentless. He has less energy for spontaneity, but the output... the output is impressive.", type:'thought' },
+  { id:'first_routine', cond:g=>Object.keys(g.routines).length>=1 && !g.thoughtFlags.first_routine, text:"Brian built a routine. It runs on energy now, same as he does. Automation doesn't replace effort. It just schedules it.", type:'thought' },
+  { id:'routine3', cond:g=>Object.keys(g.routines).length>=3 && !g.thoughtFlags.routine3, text:"Three routines. Brian's life is a machine now. Efficient. Relentless. Push the rate too hard and the cheap habits eat the day's energy before the big moves land.", type:'thought' },
   { id:'energy_budget', cond:g=>g.maxEnergy<=50 && g.phase>=2 && !g.thoughtFlags.energy_budget, text:"Brian's energy budget is thin. Every routine carved a piece away. Friends are the only thing keeping the lights on.", type:'thought' },
   { id:'friends10', cond:g=>totalFriends(g)>=10 && !g.thoughtFlags.friends10, text:"Ten people who know Brian's name. Ten people who'd answer if he called. Brian's phone never stops pinging.", type:'thought' },
   { id:'friends25', cond:g=>totalFriends(g)>=25 && !g.thoughtFlags.friends25, text:"Twenty-five friends. Brian can't remember all their birthdays. He buys a planner. Then another planner for the planner.", type:'thought' },
@@ -1011,7 +1033,10 @@ function getDefaultState() {
     globalFriendRegenMult: 1,
     repMult: 1, bonusRepPerSec: 0,
     routines: {}, // { routineId: true }
-    routineTimers: {}, // { routineId: timerValue }
+    routineTimers: {}, // legacy
+    routineRate: 1,
+    routineProgress: 0,
+    routineCursor: 0,
     // Phase 3
     influence: 0, totalInfluence: 0,
     publicOpinion: 50,
@@ -1531,6 +1556,29 @@ function tickAutomation(dt) {
   }
 }
 
+function tickRoutines(dt) {
+  if (game.phase < 2 || game.routineRate <= 0) return;
+  const activeRoutines = getActiveRoutinesSorted();
+  if (!activeRoutines.length) {
+    game.routineProgress = 0;
+    game.routineCursor = 0;
+    return;
+  }
+
+  game.routineProgress += dt * game.routineRate;
+  while (game.routineProgress >= 1) {
+    game.routineProgress -= 1;
+    const routine = activeRoutines[game.routineCursor % activeRoutines.length];
+    game.routineCursor = (game.routineCursor + 1) % activeRoutines.length;
+    if (!routine) continue;
+    resolveAction(routine.actionId, {
+      countAsClick: false,
+      useCombo: false,
+      showFloat: false,
+    });
+  }
+}
+
 function buyFriend(typeId) {
   const cost = getFriendCost(typeId);
   if (game.cp < cost) return;
@@ -1544,10 +1592,8 @@ function buyRoutine(routineId) {
   if (game.cp < r.cost) return;
   game.cp -= r.cost;
   game.routines[routineId] = true;
-  game.routineTimers[routineId] = 0;
-  game.maxEnergy -= r.energyDrain;
-  if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
-  addMsg(`Routine established: ${r.name} (-${r.energyDrain} max energy)`, 'event');
+  game.routineCursor = 0;
+  addMsg(`Routine established: ${r.name} (uses energy while active)`, 'event');
 }
 
 function buyInitiative(initId) {
@@ -2080,18 +2126,38 @@ function renderRoutines() {
   const list = document.getElementById('routines-list');
   let html = '';
   // Show active routines
-  const activeCount = Object.keys(game.routines).length;
+  const activeRoutines = getActiveRoutinesSorted();
+  const activeCount = activeRoutines.length;
   if (activeCount > 0) {
-    html += `<div style="font-size:11px;color:#666;margin-bottom:4px;">Active routines: ${activeCount} | Energy budget: -${Object.keys(game.routines).reduce((sum, rid) => {
-      const r = ROUTINES.find(x=>x.id===rid);
-      return sum + (r ? r.energyDrain : 0);
-    }, 0)} max energy</div>`;
+    const rateLabel = game.routineRate > 0 ? `${game.routineRate.toFixed(1)}/s` : 'Paused';
+    html += `<div class="automation-box">
+      <div class="automation-title">
+        <span>Routine Engine</span>
+        <span class="automation-rate">${rateLabel}</span>
+      </div>
+      <div class="automation-row">
+        <span>Active routines</span>
+        <span>${activeCount}</span>
+      </div>
+      <div class="automation-row">
+        <span>Order</span>
+        <span>Cheapest to most expensive</span>
+      </div>
+      <div class="automation-row">
+        <span>Routine rate</span>
+        <span>${game.routineRate.toFixed(1)} actions/s</span>
+      </div>
+      <input class="automation-slider" type="range" min="0" max="10" step="0.5" value="${game.routineRate}" oninput="setRoutineRate(this.value)">
+      <div class="automation-note">Routines spend real energy each action and rotate in ascending energy cost order.</div>
+    </div>`;
   }
   for (const r of ROUTINES) {
+    const action = findAction(r.actionId);
+    const result = action ? getActionCpGain(action) : null;
     if (game.routines[r.id]) {
       html += `<button class="routine-btn active" disabled>
         <b>${r.name}</b> <span style="color:#4a4;">ACTIVE</span>
-        <span class="r-desc">Auto: ${findAction(r.actionId)?.name} every ${r.interval}s</span>
+        <span class="r-desc">Auto: ${action?.name || 'Unknown'} | ${result ? result.energy : '?'} energy per action | +${result ? fmt(result.cp) : '?'} Charisma</span>
       </button>`;
       continue;
     }
@@ -2099,7 +2165,7 @@ function renderRoutines() {
     const affordable = game.cp >= r.cost;
     html += `<button class="routine-btn${affordable?' affordable':''}" onclick="buyRoutine('${r.id}')" ${affordable?'':' disabled'}>
       <b>${r.name}</b> <span class="r-cost">[${fmt(r.cost)} Charisma]</span>
-      <span class="r-desc">Auto: ${findAction(r.actionId)?.name} every ${r.interval}s | Costs ${r.energyDrain} max energy permanently</span>
+      <span class="r-desc">Auto: ${action?.name || 'Unknown'} | ${result ? result.energy : '?'} energy per action | +${result ? fmt(result.cp) : '?'} Charisma</span>
     </button>`;
   }
   list.innerHTML = html;
@@ -2427,33 +2493,13 @@ function gameTick() {
   }
 
   tickAutomation(dt);
+  tickRoutines(dt);
 
   // Phase 2+: Rep generation from friends
   if (game.phase >= 2) {
     const repGain = getRepPerSec() * dt;
     game.reputation += repGain;
     game.totalReputation += repGain;
-  }
-
-  // Phase 2+: Routine auto-actions
-  if (game.phase >= 2) {
-    for (const r of ROUTINES) {
-      if (!game.routines[r.id]) continue;
-      game.routineTimers[r.id] = (game.routineTimers[r.id] || 0) + dt;
-      if (game.routineTimers[r.id] >= r.interval) {
-        game.routineTimers[r.id] = 0;
-        const action = findAction(r.actionId);
-        if (action) {
-          const result = getActionCpGain(action);
-          // Routines don't cost energy (the permanent drain was the cost)
-          if (result.cp > 0) {
-            game.cp += result.cp;
-            game.totalCp += result.cp;
-          }
-          game.stats.actions++;
-        }
-      }
-    }
   }
 
   // Phase 3+
@@ -2600,12 +2646,11 @@ function rebuildDerivedState() {
   if (game.upgrades.p2_energy7) maxEnergyFromUpgrades += 175;
   if (game.upgrades.p3_energy8) maxEnergyFromUpgrades += 300;
   if (game.projects[4] === 'b') maxEnergyFromUpgrades *= 3;
-  for (const rid of Object.keys(game.routines)) {
-    const r = ROUTINES.find(x=>x.id===rid);
-    if (r) maxEnergyFromUpgrades -= r.energyDrain;
-  }
   game.maxEnergy = Math.max(10, maxEnergyFromUpgrades);
   if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+  game.routineRate = Math.max(0, Math.min(game.routineRate || 1, 10));
+  game.routineProgress = Math.max(0, game.routineProgress || 0);
+  game.routineCursor = Math.max(0, game.routineCursor || 0);
 
   reapplyUpgradeActionEffects();
   sanitizeAutomationState();
