@@ -326,6 +326,10 @@ body { padding-top: 3px; }
   font-size: 11px; color: #555; font-family: inherit;
   margin-right: 8px; white-space: nowrap;
 }
+#last-updated {
+  font-size: 11px; color: #555; font-family: inherit;
+  margin-right: 8px; white-space: nowrap;
+}
 /* Panel entrance animation */
 @keyframes panel-highlight {
   0% { background: #1a2018; box-shadow: 0 0 8px rgba(80,120,50,0.3); }
@@ -435,6 +439,7 @@ body { padding-top: 3px; }
   </div>
   <div id="topbar-controls">
     <span id="time-played">0m 0s</span>
+    <span id="last-updated">Updated: checking...</span>
     <button onclick="saveGame()">Save</button>
     <button onclick="showExport()">Export</button>
     <button onclick="showImport()">Import</button>
@@ -1048,6 +1053,23 @@ function totalFriends(g) {
 function clampOpinion() {
   if (game.flags.opinionLocked) { game.publicOpinion = 50; return; }
   game.publicOpinion = Math.max(0, Math.min(100, game.publicOpinion));
+}
+
+function updateLastUpdatedLabel() {
+  const el = document.getElementById('last-updated');
+  if (!el) return;
+  const lastModified = document.lastModified ? new Date(document.lastModified) : null;
+  if (!lastModified || Number.isNaN(lastModified.getTime())) {
+    el.textContent = 'Updated: unknown';
+    return;
+  }
+  el.textContent = `Updated: ${lastModified.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })}`;
 }
 
 function getAutomationConfig() {
@@ -2736,6 +2758,7 @@ function init() {
   if (!loaded) {
     addMsg("Brian wakes up. He has a simple thought: just... be Brian.", 'thought');
   }
+  updateLastUpdatedLabel();
   updatePhaseUI();
   // On load, instantly reveal panels
   for (const pu of PANEL_UNLOCKS) {
