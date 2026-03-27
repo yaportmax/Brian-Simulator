@@ -679,7 +679,9 @@ const UPGRADES = [
     desc:'Walk gives +3 Charisma', effect: g=>{ findAction('walk').cpGain += 3; } },
   { id:'p1_wardrobe', name:'New Wardrobe', cost:250, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=250,
     desc:'Talk gives +4 Charisma', effect: g=>{ findAction('talk').cpGain += 4; } },
-  { id:'p1_combo1', name:'Flow State', cost:350, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=COMBO_UNLOCK_CP,
+  { id:'p1_combo_unlock', name:'Find the Rhythm', cost:300, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=COMBO_UNLOCK_CP,
+    desc:'Unlock click combos', effect: g=>{} },
+  { id:'p1_combo1', name:'Flow State', cost:350, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock,
     desc:'Combo window +0.75s', effect: g=>{ g.comboWindowBonus += 0.75; } },
   { id:'p1_click1', name:'Social Awareness', cost:400, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=400,
     desc:'+1 Charisma per action (all)', effect: g=>{ g.clickBonus += 1; } },
@@ -687,17 +689,17 @@ const UPGRADES = [
     desc:`Energy regen +${ENERGY_REGEN_BONUSES.p1_energy3}/s`, effect: g=>{ g.energyRegen += ENERGY_REGEN_BONUSES.p1_energy3; } },
   { id:'p1_cookbook', name:'Cookbook', cost:1200, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=1200,
     desc:'Cook gives +4 Charisma', effect: g=>{ findAction('cook').cpGain += 4; } },
-  { id:'p1_combo2', name:'Warm Hands', cost:1600, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=4500,
+  { id:'p1_combo2', name:'Warm Hands', cost:1600, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock&&g.totalCp>=4500,
     desc:'Combo thresholds 20% easier', effect: g=>{ g.comboThresholdMult *= 0.8; } },
   { id:'p1_energy4', name:'Power Naps', cost:2000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=2000,
     desc:`+50 max energy, +${ENERGY_REGEN_BONUSES.p1_energy4}/s regen`, effect: g=>{ g.maxEnergy += 50; g.energyRegen += ENERGY_REGEN_BONUSES.p1_energy4; } },
   { id:'p1_click2', name:'Confidence Boost', cost:3000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=3000,
     desc:'+2 Charisma per action (all)', effect: g=>{ g.clickBonus += 2; } },
-  { id:'p1_combo3', name:'Adrenaline Loop', cost:4500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=7000,
+  { id:'p1_combo3', name:'Adrenaline Loop', cost:4500, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock&&g.totalCp>=7000,
     desc:'Combo multipliers x1.25', effect: g=>{ g.comboMultStrength *= 1.25; } },
   { id:'p1_gym', name:'Gym Membership', cost:5000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=5000,
     desc:'Gym gives +8 Charisma, costs -5 energy', effect: g=>{ findAction('gym').cpGain += 8; findAction('gym').energyCost -= 5; } },
-  { id:'p1_combo4', name:'Perfect Rhythm', cost:8500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=10000,
+  { id:'p1_combo4', name:'Perfect Rhythm', cost:8500, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock&&g.totalCp>=10000,
     desc:'Manual actions add +1 extra combo', effect: g=>{ g.comboGain += 1; } },
   { id:'p1_networking', name:'Networking Book', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=9000,
     desc:'Meetup gives +12 Charisma', effect: g=>{ findAction('meetup').cpGain += 12; } },
@@ -705,7 +707,7 @@ const UPGRADES = [
     desc:'Unlock best energy efficiency readout', effect: g=>{} },
   { id:'p1_charm', name:'Natural Charm', cost:12000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12000,
     desc:'All Charisma gains x1.5', effect: g=>{ g.globalCpMult *= 1.5; } },
-  { id:'p1_combo5', name:'Perfect Flow', cost:10000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=13000,
+  { id:'p1_combo5', name:'Perfect Flow', cost:10000, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock&&g.totalCp>=13000,
     desc:'Combo window +1s and combo multipliers x1.2', effect: g=>{ g.comboWindowBonus += 1; g.comboMultStrength *= 1.2; } },
   { id:'p1_auto_brian', name:'Auto Being Brian', cost:4000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=7000,
     desc:'Unlock Auto Brian. Automate Be Brian with a rate slider up to 1.5/s.', effect: g=>{} },
@@ -1125,7 +1127,7 @@ function sanitizeAutomationState() {
 }
 
 function isComboUnlocked() {
-  return game.totalCp >= COMBO_UNLOCK_CP;
+  return !!game.upgrades.p1_combo_unlock;
 }
 
 function isEfficiencyInsightUnlocked() {
