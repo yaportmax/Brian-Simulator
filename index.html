@@ -7,7 +7,7 @@
 <script>
 // Auto-update: check every 30s if a new version has been deployed, reload if so
 (function(){
-  var BUILD = '20260327a';
+  var BUILD = '20260327b';
   setInterval(function(){
     fetch(location.href, {cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
       var m = t.match(/var BUILD = '([^']+)'/);
@@ -2827,8 +2827,10 @@ function init() {
   renderMessages();
   setInterval(gameTick, TICK_MS);
 }
-
-init();
 </script>
+<script src="activity_content.js"></script>
+<script src="jake_content.js"></script>
+<script src="expansion_engine.js"></script>
+<script>init();</script>
 </body>
 </html>

@@ -11,3 +11,7 @@ Original prompt: can you consolidate auto brian and routines? just pick one and 
 - Softened mid-phase rep acceleration by delaying/lowering the strongest rep multipliers so Phase 2 has more room to breathe.
 - Verified in a headless browser: Phase 2 stayed active at `10,050` Rep, stayed active at `30,000` Rep without `Brian OS`, and advanced to Phase 3 only when both the new Rep gate and capstone were satisfied.
 - Removed the upgrade progress counter so the UI no longer reveals how many upgrades remain.
+- Expansion pass: added `activity_content.js`, `jake_content.js`, and `expansion_engine.js` so the game now boots with shared gambling, auto-battler, and hustle systems plus a second Jake campaign.
+- Brian now gets a shared Activities panel, and the ending flow adds a `Become Jake` option that launches a full 5-phase Jake run in the same save.
+- Jake mode is live with its own actions, upgrades, crew economy, branching choices, thoughts, phase progression, and ending flow.
+- Verified in a headless browser: Brian activities panel rendered and changed state, `Become Jake` appeared in the ending overlay, Jake started correctly, Jake actions generated cash, and Jake gambling changed state with no console/runtime errors.
