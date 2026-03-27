@@ -652,6 +652,7 @@ const INITIATIVES = [
 
 const BASE_ENERGY_REGEN = 0.5;
 const COMBO_UNLOCK_CP = 3000;
+const EFFICIENCY_INSIGHT_CP = 9000;
 const ENERGY_REGEN_BONUSES = {
   p1_energy2: 0.6,
   p1_energy3: 1.0,
@@ -700,6 +701,8 @@ const UPGRADES = [
     desc:'Manual actions add +1 extra combo', effect: g=>{ g.comboGain += 1; } },
   { id:'p1_networking', name:'Networking Book', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=9000,
     desc:'Meetup gives +12 Charisma', effect: g=>{ findAction('meetup').cpGain += 12; } },
+  { id:'p1_efficiency', name:'Personal Analytics', cost:9500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=EFFICIENCY_INSIGHT_CP,
+    desc:'Unlock best energy efficiency readout', effect: g=>{} },
   { id:'p1_charm', name:'Natural Charm', cost:12000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12000,
     desc:'All Charisma gains x1.5', effect: g=>{ g.globalCpMult *= 1.5; } },
   { id:'p1_combo5', name:'Perfect Flow', cost:10000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=13000,
@@ -1125,6 +1128,10 @@ function isComboUnlocked() {
   return game.totalCp >= COMBO_UNLOCK_CP;
 }
 
+function isEfficiencyInsightUnlocked() {
+  return !!game.upgrades.p1_efficiency;
+}
+
 // =========================================================================
 // FLOATING NUMBERS
 // =========================================================================
@@ -1445,6 +1452,7 @@ function getActionCpGain(action) {
 }
 
 function getEnergyToCharismaRatio() {
+  if (!isEfficiencyInsightUnlocked()) return null;
   const choices = ACTIONS.filter(a => a.phase <= game.phase && (a.phase > 1 || game.totalCp >= a.unlockTotalCp));
   if (!choices.length) return null;
 
@@ -2138,7 +2146,7 @@ function renderResources() {
   }
   html += `<div class="res-line"><span class="res-label">Charisma:</span> <span class="res-val">${fmt(game.cp)}</span> ${trendArrow('cp')}${cpps>0?' <span class="res-rate">(+'+fmt(cpps)+'/s)</span>':''}${cpDecayNote}</div>`;
   if (ratioInfo) {
-    html += `<div class="res-line"><span class="res-label">Energy → Charisma:</span> <span class="res-val">${fmt(ratioInfo.ratio)}</span> <span class="res-rate">CP per energy (${ratioInfo.actionName})</span></div>`;
+    html += `<div class="res-line"><span class="res-label">Best Efficiency:</span> <span class="res-val">${fmt(ratioInfo.ratio)}</span> <span class="res-rate">CP per energy via ${ratioInfo.actionName}</span></div>`;
   }
   // Phase 2+
   if (game.phase >= 2) {
