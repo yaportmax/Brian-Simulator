@@ -634,6 +634,9 @@ const ROUTINES = [
   { id:'routine_cook', name:'Meal Prep', actionId:'cook', cost:3000, unlockFn:g=>g.phase>=2&&g.totalCp>=80000 },
   { id:'routine_gym', name:'Gym Routine', actionId:'gym', cost:5000, unlockFn:g=>g.phase>=2&&g.totalCp>=120000 },
   { id:'routine_meetup', name:'Social Calendar', actionId:'meetup', cost:8000, unlockFn:g=>g.phase>=2&&g.totalCp>=180000 },
+  { id:'routine_dinner_party', name:'Dinner Circuit', actionId:'dinner_party', cost:12000, unlockFn:g=>g.phase>=2&&g.totalCp>=260000 },
+  { id:'routine_give_talk', name:'Speaking Tour', actionId:'give_talk', cost:18000, unlockFn:g=>g.phase>=2&&g.totalCp>=360000 },
+  { id:'routine_big_event', name:'Event Machine', actionId:'big_event', cost:26000, unlockFn:g=>g.phase>=2&&g.totalCp>=500000 },
 ];
 
 // ---- INITIATIVES ----
@@ -652,6 +655,8 @@ const INITIATIVES = [
 const BASE_ENERGY_REGEN = 0.5;
 const COMBO_UNLOCK_CP = 3000;
 const EFFICIENCY_INSIGHT_CP = 9000;
+const PHASE3_REPUTATION_REQ = 30000;
+const PHASE3_AUTOMATION_MODULE_REQ = 6;
 const ENERGY_REGEN_BONUSES = {
   p1_energy2: 0.6,
   p1_energy3: 1.0,
@@ -714,7 +719,7 @@ const UPGRADES = [
     desc:'Add Coffee, Walk, Talk, Work, Read, and Cook to automation. Rate cap 3/s.', effect: g=>{} },
   { id:'p1_auto_social', name:'Social Autopilot', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12500&&g.upgrades.p1_auto_habits,
     desc:'Add Gym, Meetup, Dinner Party, Give a Talk, and Big Event to automation. Rate cap 5/s.', effect: g=>{} },
-  // Phase 2 (8 upgrades - thinned)
+  // Phase 2
   { id:'p2_friend1', name:'Friend Finder App', cost:300, currency:'cp', phase:2, unlockFn: g=>g.phase>=2,
     desc:'Acquaintances cost -20%', effect: g=>{ g.friendCostMult.acquaintances *= 0.8; } },
   { id:'p2_energy5', name:'Espresso Machine', cost:500, currency:'cp', phase:2, unlockFn: g=>g.phase>=2&&g.totalCp>=16000,
@@ -729,12 +734,14 @@ const UPGRADES = [
     desc:'Mentors rep/s x2', effect: g=>{ g.friendRepMult.mentors *= 2; } },
   { id:'p2_auto_manager', name:'Automation Manager', cost:3500, currency:'cp', phase:2, unlockFn: g=>g.reputation>=1400&&g.upgrades.p1_auto_social,
     desc:'Automation rate cap increased to 8/s.', effect: g=>{} },
-  { id:'p2_rep1', name:'Personal Brand', cost:4000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=1500,
+  { id:'p2_rep1', name:'Personal Brand', cost:4000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=2500,
+    desc:'All Rep gain x1.5', effect: g=>{ g.repMult *= 1.5; } },
+  { id:'p2_rep2', name:'TED Talk', cost:8000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=10000,
     desc:'All Rep gain x2', effect: g=>{ g.repMult *= 2; } },
-  { id:'p2_rep2', name:'TED Talk', cost:8000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=4000,
-    desc:'All Rep gain x3', effect: g=>{ g.repMult *= 3; } },
-  { id:'p2_mega', name:"Brian's Manifesto", cost:12000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=7000,
+  { id:'p2_mega', name:"Brian's Manifesto", cost:12000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=15000,
     desc:'All Charisma production x2', effect: g=>{ g.globalCpMult *= 2; } },
+  { id:'p2_brian_os', name:'Brian OS', cost:18000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=18000&&getAutomationModuleCount(g)>=PHASE3_AUTOMATION_MODULE_REQ&&g.upgrades.p2_auto_manager,
+    desc:`Finish the automation stack. Phase 3 unlocks at ${fmt(PHASE3_REPUTATION_REQ)} Reputation.`, effect: g=>{} },
   // Phase 3 (6 upgrades)
   { id:'p3_pr', name:'PR Department', cost:500, currency:'influence', phase:3, unlockFn: g=>g.phase>=3,
     desc:'Opinion drifts toward 50 faster', effect: g=>{ g.opinionDriftMult *= 2; } },
@@ -930,7 +937,10 @@ const THOUGHTS = [
   { id:'rep3000', cond:g=>g.reputation>=3000 && !g.thoughtFlags.rep3000, text:"Local newspaper wants to interview Brian. 'What's your secret?' they ask. Brian shrugs. He genuinely doesn't know.", type:'thought' },
   { id:'rep5000', cond:g=>g.reputation>=5000 && !g.thoughtFlags.rep5000, text:"A child asks Brian for an autograph. Brian laughs, then realizes she's serious.", type:'thought' },
   { id:'rep8000', cond:g=>g.reputation>=8000 && !g.thoughtFlags.rep8000, text:"The mayor called. THE MAYOR. Brian isn't just a person anymore.", type:'thought' },
-  { id:'rep9500', cond:g=>g.reputation>=9500 && !g.thoughtFlags.rep9500, text:"Brian can feel it. He's outgrowing this. Something bigger is coming.", type:'thought' },
+  { id:'rep15000', cond:g=>g.reputation>=15000 && !g.thoughtFlags.rep15000, text:"Fifteen thousand reputation. Brian could scale this thing into an empire, but the automation stack still feels fragile. Not ready. Not yet.", type:'thought' },
+  { id:'automation_stack_ready', cond:g=>g.reputation>=18000 && getAutomationModuleCount(g)>=PHASE3_AUTOMATION_MODULE_REQ && !g.thoughtFlags.automation_stack_ready, text:"The automation stack finally hums instead of rattles. Brian can feel the shape of something larger now. A system, not a schedule.", type:'event' },
+  { id:'rep25000', cond:g=>g.reputation>=25000 && !g.thoughtFlags.rep25000, text:"Twenty-five thousand reputation. Brian's orbit is wide enough now that meetings happen without him. That should be reassuring. It isn't.", type:'thought' },
+  { id:'rep30000', cond:g=>g.reputation>=PHASE3_REPUTATION_REQ && !g.thoughtFlags.rep30000, text:"Thirty thousand reputation. The social machine is built. If Brian wants more, he has to become something corporate.", type:'thought' },
   { id:'friends100', cond:g=>totalFriends(g)>=100 && !g.thoughtFlags.friends100, text:"One hundred friends. Brian needs a spreadsheet. He hates that he needs a spreadsheet. He loves that he needs a spreadsheet.", type:'thought' },
 
   // ===== Phase 3: Brian Inc. =====
@@ -1059,6 +1069,10 @@ function addMsg(text, type='thought') {
 
 function totalFriends(g) {
   return (g.friends.acquaintances||0)+(g.friends.close||0)+(g.friends.best||0)+(g.friends.mentors||0);
+}
+
+function getAutomationModuleCount(g = game) {
+  return Object.keys(g.routines).length;
 }
 
 function clampOpinion() {
@@ -1316,7 +1330,8 @@ function getNextMilestone() {
     const milestones = [
       { val: 150, label: 'Brian Projects unlock', res: 'rep' },
       { val: 200, label: 'First project choice', res: 'rep' },
-      { val: 10000, label: 'Phase 3', res: 'rep' },
+      { val: 18000, label: 'Brian OS unlocks', res: 'rep' },
+      { val: PHASE3_REPUTATION_REQ, label: 'Phase 3', res: 'rep' },
     ];
     for (const m of milestones) {
       if (game.reputation < m.val) return `Next at ${fmt(m.val)} Rep: ${m.label}`;
@@ -1675,7 +1690,7 @@ function checkPhaseTransitions() {
     updatePhaseUI();
     flashPhaseTransition();
   }
-  if (game.phase === 2 && game.reputation >= 10000) {
+  if (game.phase === 2 && game.reputation >= PHASE3_REPUTATION_REQ && game.upgrades.p2_brian_os) {
     game.phase = 3;
     if (game.flags.startOpinion70) game.publicOpinion = 70;
     addMsg("Brian's influence can no longer be contained in a social circle. It's time to build something bigger.", 'event');
