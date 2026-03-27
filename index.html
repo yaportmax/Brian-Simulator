@@ -7,7 +7,7 @@
 <script>
 // Auto-update: check every 30s if a new version has been deployed, reload if so
 (function(){
-  var BUILD = '20260325a';
+  var BUILD = '20260327a';
   setInterval(function(){
     fetch(location.href, {cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
       var m = t.match(/var BUILD = '([^']+)'/);
@@ -276,6 +276,25 @@ body {
 @media (max-width: 900px) {
   #main { grid-template-columns: 1fr; }
   .project-choice { flex-direction: column; }
+  #topbar { padding: 10px 12px; }
+  #topbar-controls { width: 100%; justify-content: flex-start; }
+  #topbar-controls button { padding: 8px 12px; font-size: 12px; }
+  .panel { padding: 12px; }
+  .action-btn, .upgrade-btn, .routine-btn, .initiative-btn, .remember-btn, .reality-btn {
+    min-height: 44px;
+    padding: 10px;
+  }
+  .team-btn, .friend-btn { min-height: 38px; padding: 8px 12px; }
+  #message-log { max-height: 260px; }
+}
+@media (max-width: 600px) {
+  body { font-size: 14px; line-height: 1.5; }
+  #topbar h1 { font-size: 16px; }
+  #phase-subtitle { display: block; margin-left: 0; margin-top: 2px; }
+  #time-played { width: 100%; margin-right: 0; }
+  .panel h2 { font-size: 12px; }
+  .res-line { font-size: 12px; }
+  .project-btn { padding: 10px; }
 }
 /* Import/export modal */
 #io-modal {
@@ -635,6 +654,8 @@ const AUTOMATION_TIER_UPGRADES = [
   { upgradeId: 'p1_auto_brian', actionIds: ['be_brian'], maxRate: 1.5 },
   { upgradeId: 'p1_auto_habits', actionIds: ['coffee', 'walk', 'talk', 'work', 'read', 'cook'], maxRate: 3 },
   { upgradeId: 'p1_auto_social', actionIds: ['gym', 'meetup', 'dinner_party', 'give_talk', 'big_event'], maxRate: 5 },
+  { upgradeId: 'p2_auto_manager', actionIds: ['be_brian', 'coffee', 'walk', 'talk', 'work', 'read', 'cook', 'gym', 'meetup', 'dinner_party', 'give_talk', 'big_event'], maxRate: 8 },
+  { upgradeId: 'p3_auto_director', actionIds: ['be_brian', 'coffee', 'walk', 'talk', 'work', 'read', 'cook', 'gym', 'meetup', 'dinner_party', 'give_talk', 'big_event'], maxRate: 12 },
 ];
 
 // ---- UPGRADES ----
@@ -691,8 +712,12 @@ const UPGRADES = [
     desc:'Close Friends energy regen x2', effect: g=>{ g.friendRegenMult.close *= 2; } },
   { id:'p2_energy6', name:'Personal Trainer', cost:1200, currency:'cp', phase:2, unlockFn: g=>g.reputation>=200,
     desc:'All friend energy regen x1.5', effect: g=>{ g.globalFriendRegenMult *= 1.5; } },
+  { id:'p2_energy7', name:'Weekend Recovery', cost:2200, currency:'cp', phase:2, unlockFn: g=>g.reputation>=900,
+    desc:'+175 max energy', effect: g=>{ g.maxEnergy += 175; } },
   { id:'p2_mentor1', name:'Mentorship Program', cost:2000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=500,
     desc:'Mentors rep/s x2', effect: g=>{ g.friendRepMult.mentors *= 2; } },
+  { id:'p2_auto_manager', name:'Automation Manager', cost:3500, currency:'cp', phase:2, unlockFn: g=>g.reputation>=1400&&g.upgrades.p1_auto_social,
+    desc:'Automation rate cap increased to 8/s.', effect: g=>{} },
   { id:'p2_rep1', name:'Personal Brand', cost:4000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=1500,
     desc:'All Rep gain x2', effect: g=>{ g.repMult *= 2; } },
   { id:'p2_rep2', name:'TED Talk', cost:8000, currency:'cp', phase:2, unlockFn: g=>g.reputation>=4000,
@@ -706,8 +731,12 @@ const UPGRADES = [
     desc:'All Charisma gains x5', effect: g=>{ g.globalCpMult *= 5; } },
   { id:'p3_lobbying', name:'Lobbying Power', cost:5000, currency:'influence', phase:3, unlockFn: g=>g.influence>=2000,
     desc:'Initiative costs -30%', effect: g=>{ g.initiativeCostMult *= 0.7; } },
+  { id:'p3_auto_director', name:'Autopilot Director', cost:9000, currency:'influence', phase:3, unlockFn: g=>g.influence>=4500&&g.upgrades.p2_auto_manager,
+    desc:'Automation rate cap increased to 12/s.', effect: g=>{} },
   { id:'p3_global', name:'Global Reach', cost:10000, currency:'influence', phase:3, unlockFn: g=>g.influence>=5000,
     desc:'Rep gain x10', effect: g=>{ g.repMult *= 10; } },
+  { id:'p3_energy8', name:'Executive Recharge Wing', cost:15000, currency:'influence', phase:3, unlockFn: g=>g.influence>=8000,
+    desc:'+300 max energy', effect: g=>{ g.maxEnergy += 300; } },
   { id:'p3_research', name:'Anomalous Findings', cost:30000, currency:'influence', phase:3, unlockFn: g=>g.flags.strangeResearch,
     desc:'Brian\'s scientists discover something that shouldn\'t exist...', effect: g=>{ g.flags.anomalousFindings = true; } },
   { id:'p3_protocol', name:'The Brian Protocol', cost:100000, currency:'influence', phase:3, unlockFn: g=>g.flags.anomalousFindings&&g.influence>=50000,
@@ -1373,6 +1402,24 @@ function getActionCpGain(action) {
   gain *= game.clickCpMult * game.globalCpMult * getPlaytimeProgressMult();
   let energyCost = Math.ceil(action.energyCost);
   return { cp: gain, energy: energyCost, rep: 0, wisdom: (action.wisdomGain || 0) * getPlaytimeProgressMult() };
+}
+
+function getEnergyToCharismaRatio() {
+  const choices = ACTIONS.filter(a => a.phase <= game.phase && (a.phase > 1 || game.totalCp >= a.unlockTotalCp));
+  if (!choices.length) return null;
+
+  const automationChoices = getAutomationActionChoices();
+  const sourceAction =
+    automationChoices.find(a => a.id === game.automation.targetAction) ||
+    choices.slice().sort((a, b) => (getActionCpGain(b).cp / Math.max(1, getActionCpGain(b).energy)) - (getActionCpGain(a).cp / Math.max(1, getActionCpGain(a).energy)))[0];
+
+  if (!sourceAction) return null;
+  const gain = getActionCpGain(sourceAction);
+  if (gain.energy <= 0) return null;
+  return {
+    actionName: sourceAction.name,
+    ratio: gain.cp / gain.energy,
+  };
 }
 
 // =========================================================================
@@ -2043,12 +2090,16 @@ function renderResources() {
   html += `<div class="energy-bar-wrap"><div class="energy-bar-fill" style="width:${ePct}%;background:${eColor};"></div></div>`;
   // CP
   const cpps = getCpPerSec();
+  const ratioInfo = getEnergyToCharismaRatio();
   let cpDecayNote = '';
   if (game.phase >= 4) {
     const decayRate = 0.01 * game.decayMult * (game.flags.slowCpDecay ? 0.5 : 1);
     cpDecayNote = ` <span style="color:#a44;">(-${(decayRate*100).toFixed(1)}%/s)</span>`;
   }
   html += `<div class="res-line"><span class="res-label">Charisma:</span> <span class="res-val">${fmt(game.cp)}</span> ${trendArrow('cp')}${cpps>0?' <span class="res-rate">(+'+fmt(cpps)+'/s)</span>':''}${cpDecayNote}</div>`;
+  if (ratioInfo) {
+    html += `<div class="res-line"><span class="res-label">Energy → Charisma:</span> <span class="res-val">${fmt(ratioInfo.ratio)}</span> <span class="res-rate">CP per energy (${ratioInfo.actionName})</span></div>`;
+  }
   // Phase 2+
   if (game.phase >= 2) {
     const rps = getRepPerSec();
@@ -2501,6 +2552,8 @@ function rebuildDerivedState() {
   if (game.upgrades.p1_energy1) maxEnergyFromUpgrades += 25;
   if (game.upgrades.p1_energy4) maxEnergyFromUpgrades += 50;
   if (game.upgrades.p2_energy5) maxEnergyFromUpgrades += 100;
+  if (game.upgrades.p2_energy7) maxEnergyFromUpgrades += 175;
+  if (game.upgrades.p3_energy8) maxEnergyFromUpgrades += 300;
   if (game.projects[4] === 'b') maxEnergyFromUpgrades *= 3;
   for (const rid of Object.keys(game.routines)) {
     const r = ROUTINES.find(x=>x.id===rid);
