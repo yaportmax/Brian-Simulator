@@ -2108,10 +2108,6 @@ function renderUpgrades() {
     </button>`;
   }
   const purchasedCount = Object.keys(game.upgrades).length;
-  const totalCount = UPGRADES.length;
-  if (purchasedCount > 0) {
-    html = `<div style="color:#555;font-size:10px;margin-bottom:4px;">${purchasedCount}/${totalCount} purchased</div>` + html;
-  }
   if (visibleCount === 0 && purchasedCount > 0) {
     html += '<div style="color:#999;font-size:11px;padding:4px;">No upgrades available right now.</div>';
   }

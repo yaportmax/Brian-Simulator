@@ -10,3 +10,4 @@ Original prompt: can you consolidate auto brian and routines? just pick one and 
 - Added a Phase 2 automation capstone upgrade (`Brian OS`) and moved the Phase 2 -> 3 gate to `30K` Reputation plus that capstone.
 - Softened mid-phase rep acceleration by delaying/lowering the strongest rep multipliers so Phase 2 has more room to breathe.
 - Verified in a headless browser: Phase 2 stayed active at `10,050` Rep, stayed active at `30,000` Rep without `Brian OS`, and advanced to Phase 3 only when both the new Rep gate and capstone were satisfied.
+- Removed the upgrade progress counter so the UI no longer reveals how many upgrades remain.
