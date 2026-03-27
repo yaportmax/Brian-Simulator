@@ -460,7 +460,7 @@ body { padding-top: 3px; }
       <div id="upgrades-list"></div>
     </div>
     <div class="panel panel-locked" id="panel-routines">
-      <h2>Routines</h2>
+      <h2>Automation Modules</h2>
       <div id="routines-list"></div>
     </div>
     <div class="panel panel-locked" id="panel-projects">
@@ -570,7 +570,7 @@ function fmtTime(s) {
 }
 
 // ---- ACTIONS ----
-// Phase 1 only. Phase 2 removes manual actions in favor of Routines.
+// Phase 1 actions remain available, but later automation can run them for you.
 // Phase 4 adds "Contemplate" action.
 const ACTIONS = [
   { id:'be_brian', name:'Be Brian', phase:1, energyCost:1, cpGain:1, unlockTotalCp:0, desc:'Just... be.' },
@@ -623,8 +623,8 @@ const FRIEND_TYPES = [
   { id:'mentors', name:'Mentor', baseCost:500, growth:1.8, cpPerSec:0, repPerSec:2.0, energyRegen:0.8, special:'+0.8 energy/s' },
 ];
 
-// ---- ROUTINES ----
-// Phase 2 automation: auto-perform actions using real energy at a user-controlled rate
+// ---- AUTOMATION MODULES ----
+// Phase 2 modules add more actions into the unified automation engine.
 const ROUTINES = [
   { id:'routine_coffee', name:'Morning Coffee', actionId:'coffee', cost:200, unlockFn:g=>g.phase>=2 },
   { id:'routine_walk', name:'Daily Walk', actionId:'walk', cost:500, unlockFn:g=>g.phase>=2&&g.totalCp>=16000 },
@@ -709,11 +709,11 @@ const UPGRADES = [
   { id:'p1_combo5', name:'Perfect Flow', cost:10000, currency:'cp', phase:1, unlockFn: g=>g.upgrades.p1_combo_unlock&&g.totalCp>=13000,
     desc:'Combo window +1s and combo multipliers x1.2', effect: g=>{ g.comboWindowBonus += 1; g.comboMultStrength *= 1.2; } },
   { id:'p1_auto_brian', name:'Auto Being Brian', cost:4000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=7000,
-    desc:'Unlock Auto Brian. Automate Be Brian with a rate slider up to 1.5/s.', effect: g=>{} },
+    desc:'Unlock automation. Adds Be Brian to the shared queue with a rate slider up to 1.5/s.', effect: g=>{} },
   { id:'p1_auto_habits', name:'Habit Stacking', cost:6500, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=10000&&g.upgrades.p1_auto_brian,
-    desc:'Automation can run Coffee, Walk, Talk, Work, Read, and Cook. Rate cap 3/s.', effect: g=>{} },
+    desc:'Add Coffee, Walk, Talk, Work, Read, and Cook to automation. Rate cap 3/s.', effect: g=>{} },
   { id:'p1_auto_social', name:'Social Autopilot', cost:9000, currency:'cp', phase:1, unlockFn: g=>g.totalCp>=12500&&g.upgrades.p1_auto_habits,
-    desc:'Automation can run Gym, Meetup, Dinner Party, Give a Talk, and Big Event. Rate cap 5/s.', effect: g=>{} },
+    desc:'Add Gym, Meetup, Dinner Party, Give a Talk, and Big Event to automation. Rate cap 5/s.', effect: g=>{} },
   // Phase 2 (8 upgrades - thinned)
   { id:'p2_friend1', name:'Friend Finder App', cost:300, currency:'cp', phase:2, unlockFn: g=>g.phase>=2,
     desc:'Acquaintances cost -20%', effect: g=>{ g.friendCostMult.acquaintances *= 0.8; } },
@@ -759,39 +759,22 @@ function findAction(id) { return ACTIONS.find(a=>a.id===id); }
 function setAutomationRate(value) {
   const config = sanitizeAutomationState();
   game.automation.rate = Math.max(0, Math.min(parseFloat(value) || 0, config.maxRate));
-  if (game.automation.rate === 0) game.automation.progress = 0;
+  if (game.automation.rate === 0) {
+    game.automation.progress = 0;
+    game.automation.cursor = 0;
+  }
   updateUI();
 }
 
-function setAutomationTarget(actionId) {
-  const choices = getAutomationActionChoices();
-  if (!choices.some(a => a.id === actionId)) return;
-  game.automation.targetAction = actionId;
-  game.automation.progress = 0;
-  updateUI();
-}
-
-function getActiveRoutinesSorted() {
-  return ROUTINES
-    .filter(r => game.routines[r.id])
+function getAutomationActionsSorted() {
+  return getAutomationActionChoices()
     .slice()
     .sort((a, b) => {
-      const actionA = findAction(a.actionId);
-      const actionB = findAction(b.actionId);
-      const costA = actionA ? getActionCpGain(actionA).energy : Infinity;
-      const costB = actionB ? getActionCpGain(actionB).energy : Infinity;
+      const costA = getActionCpGain(a).energy;
+      const costB = getActionCpGain(b).energy;
       if (costA !== costB) return costA - costB;
       return a.name.localeCompare(b.name);
     });
-}
-
-function setRoutineRate(value) {
-  game.routineRate = Math.max(0, Math.min(parseFloat(value) || 0, 10));
-  if (game.routineRate === 0) {
-    game.routineProgress = 0;
-    game.routineCursor = 0;
-  }
-  updateUI();
 }
 
 // ---- BRIAN PROJECTS ----
@@ -935,9 +918,9 @@ const THOUGHTS = [
   // ===== Phase 2: The Reputation Economy =====
   { id:'p2_start', cond:g=>g.phase>=2 && !g.thoughtFlags.p2_start, text:"Brian isn't alone anymore. People actually want to be around him. And they're starting to talk.", type:'event' },
   { id:'first_rep', cond:g=>g.reputation>=1 && !g.thoughtFlags.first_rep, text:"Reputation. It's like Charisma, but it travels without you. People know Brian before he walks into the room.", type:'thought' },
-  { id:'first_routine', cond:g=>Object.keys(g.routines).length>=1 && !g.thoughtFlags.first_routine, text:"Brian built a routine. It runs on energy now, same as he does. Automation doesn't replace effort. It just schedules it.", type:'thought' },
-  { id:'routine3', cond:g=>Object.keys(g.routines).length>=3 && !g.thoughtFlags.routine3, text:"Three routines. Brian's life is a machine now. Efficient. Relentless. Push the rate too hard and the cheap habits eat the day's energy before the big moves land.", type:'thought' },
-  { id:'energy_budget', cond:g=>g.maxEnergy<=50 && g.phase>=2 && !g.thoughtFlags.energy_budget, text:"Brian's energy budget is thin. Every routine carved a piece away. Friends are the only thing keeping the lights on.", type:'thought' },
+  { id:'first_routine', cond:g=>Object.keys(g.routines).length>=1 && !g.thoughtFlags.first_routine, text:"Brian wired a habit into the automation stack. It still runs on energy. The machine doesn't replace effort. It just spends it faster.", type:'thought' },
+  { id:'routine3', cond:g=>Object.keys(g.routines).length>=3 && !g.thoughtFlags.routine3, text:"Three automation modules. Brian's life is a machine now. Efficient. Relentless. Push the rate too hard and the cheap habits eat the day's energy before the big moves land.", type:'thought' },
+  { id:'energy_budget', cond:g=>g.energy<=10 && g.phase>=2 && Object.keys(g.routines).length>=1 && !g.thoughtFlags.energy_budget, text:"Brian's energy budget is thin. The automation stack is chewing through the easy habits before the heavy hitters get their turn. Friends are the only thing keeping the lights on.", type:'thought' },
   { id:'friends10', cond:g=>totalFriends(g)>=10 && !g.thoughtFlags.friends10, text:"Ten people who know Brian's name. Ten people who'd answer if he called. Brian's phone never stops pinging.", type:'thought' },
   { id:'friends25', cond:g=>totalFriends(g)>=25 && !g.thoughtFlags.friends25, text:"Twenty-five friends. Brian can't remember all their birthdays. He buys a planner. Then another planner for the planner.", type:'thought' },
   { id:'friends50', cond:g=>totalFriends(g)>=50 && !g.thoughtFlags.friends50, text:"Fifty friends. Brian throws a party and half the neighborhood shows up. The other half wishes they'd been invited.", type:'thought' },
@@ -1017,7 +1000,7 @@ function getDefaultState() {
     // Phase 1
     cp: 0, totalCp: 0,
     energy: 100, maxEnergy: 100, energyRegen: BASE_ENERGY_REGEN,
-    automation: { rate: 0, targetAction: 'be_brian', progress: 0 },
+    automation: { rate: 0, progress: 0, cursor: 0 },
     comboWindowBonus: 0,
     comboThresholdMult: 1,
     comboMultStrength: 1,
@@ -1034,9 +1017,6 @@ function getDefaultState() {
     repMult: 1, bonusRepPerSec: 0,
     routines: {}, // { routineId: true }
     routineTimers: {}, // legacy
-    routineRate: 1,
-    routineProgress: 0,
-    routineCursor: 0,
     // Phase 3
     influence: 0, totalInfluence: 0,
     publicOpinion: 50,
@@ -1111,6 +1091,11 @@ function getAutomationConfig() {
     actionIds.push(...tier.actionIds);
     maxRate = tier.maxRate;
   }
+  for (const routine of ROUTINES) {
+    if (!game.routines[routine.id]) continue;
+    actionIds.push(routine.actionId);
+    maxRate = Math.max(maxRate, 5);
+  }
   return {
     unlocked: actionIds.length > 0,
     actionIds: [...new Set(actionIds)],
@@ -1132,7 +1117,7 @@ function sanitizeAutomationState() {
   if (!config.unlocked) {
     game.automation.rate = 0;
     game.automation.progress = 0;
-    game.automation.targetAction = 'be_brian';
+    game.automation.cursor = 0;
     return config;
   }
 
@@ -1140,14 +1125,13 @@ function sanitizeAutomationState() {
   if (!choices.length) {
     game.automation.rate = 0;
     game.automation.progress = 0;
+    game.automation.cursor = 0;
     return config;
   }
 
-  if (!choices.some(a => a.id === game.automation.targetAction)) {
-    game.automation.targetAction = choices[0].id;
-    game.automation.progress = 0;
-  }
   game.automation.rate = Math.max(0, Math.min(game.automation.rate || 0, config.maxRate));
+  game.automation.progress = Math.max(0, game.automation.progress || 0);
+  game.automation.cursor = Math.max(0, game.automation.cursor || 0);
   return config;
 }
 
@@ -1397,6 +1381,21 @@ function getCpPerSec() {
   return cps * getPlaytimeProgressMult();
 }
 
+function getAutomationCharismaPerSec() {
+  const config = sanitizeAutomationState();
+  if (!config.unlocked || game.automation.rate <= 0) return 0;
+  const actions = getAutomationActionsSorted();
+  if (!actions.length) return 0;
+  const totalCp = actions.reduce((sum, action) => {
+    return sum + getActionCpGain(action).cp;
+  }, 0);
+  return totalCp * (game.automation.rate / actions.length);
+}
+
+function getDisplayedCharismaPerSec() {
+  return getCpPerSec() + getAutomationCharismaPerSec();
+}
+
 function getRepPerSec() {
   if (game.phase < 2) return 0;
   let rps = 0;
@@ -1483,10 +1482,9 @@ function getEnergyToCharismaRatio() {
   const choices = ACTIONS.filter(a => a.phase <= game.phase && (a.phase > 1 || game.totalCp >= a.unlockTotalCp));
   if (!choices.length) return null;
 
-  const automationChoices = getAutomationActionChoices();
-  const sourceAction =
-    automationChoices.find(a => a.id === game.automation.targetAction) ||
-    choices.slice().sort((a, b) => (getActionCpGain(b).cp / Math.max(1, getActionCpGain(b).energy)) - (getActionCpGain(a).cp / Math.max(1, getActionCpGain(a).energy)))[0];
+  const sourceAction = choices
+    .slice()
+    .sort((a, b) => (getActionCpGain(b).cp / Math.max(1, getActionCpGain(b).energy)) - (getActionCpGain(a).cp / Math.max(1, getActionCpGain(a).energy)))[0];
 
   if (!sourceAction) return null;
   const gain = getActionCpGain(sourceAction);
@@ -1545,33 +1543,19 @@ function performAction(actionId, e) {
 function tickAutomation(dt) {
   const config = sanitizeAutomationState();
   if (!config.unlocked || game.automation.rate <= 0) return;
+  const actions = getAutomationActionsSorted();
+  if (!actions.length) {
+    game.automation.progress = 0;
+    game.automation.cursor = 0;
+    return;
+  }
   game.automation.progress += dt * game.automation.rate;
   while (game.automation.progress >= 1) {
     game.automation.progress -= 1;
-    resolveAction(game.automation.targetAction, {
-      countAsClick: false,
-      useCombo: false,
-      showFloat: false,
-    });
-  }
-}
-
-function tickRoutines(dt) {
-  if (game.phase < 2 || game.routineRate <= 0) return;
-  const activeRoutines = getActiveRoutinesSorted();
-  if (!activeRoutines.length) {
-    game.routineProgress = 0;
-    game.routineCursor = 0;
-    return;
-  }
-
-  game.routineProgress += dt * game.routineRate;
-  while (game.routineProgress >= 1) {
-    game.routineProgress -= 1;
-    const routine = activeRoutines[game.routineCursor % activeRoutines.length];
-    game.routineCursor = (game.routineCursor + 1) % activeRoutines.length;
-    if (!routine) continue;
-    resolveAction(routine.actionId, {
+    const action = actions[game.automation.cursor % actions.length];
+    game.automation.cursor = (game.automation.cursor + 1) % actions.length;
+    if (!action) continue;
+    resolveAction(action.id, {
       countAsClick: false,
       useCombo: false,
       showFloat: false,
@@ -1592,8 +1576,8 @@ function buyRoutine(routineId) {
   if (game.cp < r.cost) return;
   game.cp -= r.cost;
   game.routines[routineId] = true;
-  game.routineCursor = 0;
-  addMsg(`Routine established: ${r.name} (uses energy while active)`, 'event');
+  game.automation.cursor = 0;
+  addMsg(`Automation module installed: ${r.name}`, 'event');
 }
 
 function buyInitiative(initId) {
@@ -2043,27 +2027,25 @@ function renderActions() {
   const activeComboTier = getActiveComboTier();
   const comboNote = activeComboTier ? ` <span style="color:#5a5;font-size:10px;">COMBO ${activeComboTier.label}</span>` : '';
   const automationConfig = sanitizeAutomationState();
-  const automationChoices = getAutomationActionChoices();
-  if (automationConfig.unlocked && automationChoices.length) {
+  const automationActions = getAutomationActionsSorted();
+  if (automationConfig.unlocked && automationActions.length) {
     const rateLabel = game.automation.rate > 0 ? `${game.automation.rate.toFixed(1)}/s` : 'Paused';
     html += `<div class="automation-box">
       <div class="automation-title">
-        <span>Auto Brian</span>
+        <span>Automation</span>
         <span class="automation-rate">${rateLabel}</span>
       </div>
       <div class="automation-row">
-        <span>Target</span>
+        <span>Automated actions</span>
         <span>${automationConfig.maxRate.toFixed(1)}/s cap</span>
       </div>
-      <select class="automation-select" onchange="setAutomationTarget(this.value)">
-        ${automationChoices.map(a => `<option value="${a.id}" ${a.id===game.automation.targetAction?'selected':''}>${a.name}</option>`).join('')}
-      </select>
+      <div class="automation-note">${automationActions.map(a => a.name).join(' -> ')}</div>
       <div class="automation-row">
         <span>Rate</span>
         <span>${game.automation.rate.toFixed(1)} actions/s</span>
       </div>
       <input class="automation-slider" type="range" min="0" max="${automationConfig.maxRate}" step="0.5" value="${game.automation.rate}" oninput="setAutomationRate(this.value)">
-      <div class="automation-note">Uses normal energy and follows normal action costs. Auto Brian never builds combo.</div>
+      <div class="automation-note">Runs in ascending energy cost order, spends real energy each action, and never builds combo.</div>
     </div>`;
   }
   if (comboNote) html += `<div style="font-size:11px;color:#4a4;margin-bottom:2px;">Combo active: ${activeComboTier?.label||''}</div>`;
@@ -2125,30 +2107,22 @@ function renderRoutines() {
   if (game.phase < 2) return;
   const list = document.getElementById('routines-list');
   let html = '';
-  // Show active routines
-  const activeRoutines = getActiveRoutinesSorted();
-  const activeCount = activeRoutines.length;
-  if (activeCount > 0) {
-    const rateLabel = game.routineRate > 0 ? `${game.routineRate.toFixed(1)}/s` : 'Paused';
+  const activeModules = ROUTINES.filter(r => game.routines[r.id]);
+  if (activeModules.length > 0) {
     html += `<div class="automation-box">
       <div class="automation-title">
-        <span>Routine Engine</span>
-        <span class="automation-rate">${rateLabel}</span>
+        <span>Automation Modules</span>
+        <span class="automation-rate">${activeModules.length} live</span>
       </div>
       <div class="automation-row">
-        <span>Active routines</span>
-        <span>${activeCount}</span>
+        <span>Unlocked modules</span>
+        <span>${activeModules.length}</span>
       </div>
       <div class="automation-row">
         <span>Order</span>
         <span>Cheapest to most expensive</span>
       </div>
-      <div class="automation-row">
-        <span>Routine rate</span>
-        <span>${game.routineRate.toFixed(1)} actions/s</span>
-      </div>
-      <input class="automation-slider" type="range" min="0" max="10" step="0.5" value="${game.routineRate}" oninput="setRoutineRate(this.value)">
-      <div class="automation-note">Routines spend real energy each action and rotate in ascending energy cost order.</div>
+      <div class="automation-note">Automation rate lives in the Actions panel. Modules here add more actions into that shared queue.</div>
     </div>`;
   }
   for (const r of ROUTINES) {
@@ -2157,7 +2131,7 @@ function renderRoutines() {
     if (game.routines[r.id]) {
       html += `<button class="routine-btn active" disabled>
         <b>${r.name}</b> <span style="color:#4a4;">ACTIVE</span>
-        <span class="r-desc">Auto: ${action?.name || 'Unknown'} | ${result ? result.energy : '?'} energy per action | +${result ? fmt(result.cp) : '?'} Charisma</span>
+        <span class="r-desc">Adds ${action?.name || 'Unknown'} to automation | ${result ? result.energy : '?'} energy | +${result ? fmt(result.cp) : '?'} Charisma</span>
       </button>`;
       continue;
     }
@@ -2165,7 +2139,7 @@ function renderRoutines() {
     const affordable = game.cp >= r.cost;
     html += `<button class="routine-btn${affordable?' affordable':''}" onclick="buyRoutine('${r.id}')" ${affordable?'':' disabled'}>
       <b>${r.name}</b> <span class="r-cost">[${fmt(r.cost)} Charisma]</span>
-      <span class="r-desc">Auto: ${action?.name || 'Unknown'} | ${result ? result.energy : '?'} energy per action | +${result ? fmt(result.cp) : '?'} Charisma</span>
+      <span class="r-desc">Adds ${action?.name || 'Unknown'} to automation | ${result ? result.energy : '?'} energy | +${result ? fmt(result.cp) : '?'} Charisma</span>
     </button>`;
   }
   list.innerHTML = html;
@@ -2205,14 +2179,15 @@ function renderResources() {
   html += `<div class="res-line"><span class="res-label">Energy:</span> <span class="res-val">${Math.floor(game.energy)}</span>/<span>${game.maxEnergy}</span> <span class="res-rate">(+${totalERegen.toFixed(1)}/s)</span></div>`;
   html += `<div class="energy-bar-wrap"><div class="energy-bar-fill" style="width:${ePct}%;background:${eColor};"></div></div>`;
   // CP
-  const cpps = getCpPerSec();
+  const cpps = getDisplayedCharismaPerSec();
   const ratioInfo = getEnergyToCharismaRatio();
   let cpDecayNote = '';
   if (game.phase >= 4) {
     const decayRate = 0.01 * game.decayMult * (game.flags.slowCpDecay ? 0.5 : 1);
     cpDecayNote = ` <span style="color:#a44;">(-${(decayRate*100).toFixed(1)}%/s)</span>`;
   }
-  html += `<div class="res-line"><span class="res-label">Charisma:</span> <span class="res-val">${fmt(game.cp)}</span> ${trendArrow('cp')}${cpps>0?' <span class="res-rate">(+'+fmt(cpps)+'/s)</span>':''}${cpDecayNote}</div>`;
+  const showCharismaRate = getAutomationConfig().unlocked || game.phase >= 2 || getCpPerSec() > 0;
+  html += `<div class="res-line"><span class="res-label">Charisma:</span> <span class="res-val">${fmt(game.cp)}</span> ${trendArrow('cp')}${showCharismaRate&&cpps>0?' <span class="res-rate">(+'+fmt(cpps)+'/s)</span>':''}${cpDecayNote}</div>`;
   if (ratioInfo) {
     html += `<div class="res-line"><span class="res-label">Best Efficiency:</span> <span class="res-val">${fmt(ratioInfo.ratio)}</span> <span class="res-rate">CP per energy via ${ratioInfo.actionName}</span></div>`;
   }
@@ -2436,7 +2411,7 @@ function renderStats() {
     <div>Momentum: x${getPlaytimeProgressMult().toFixed(2)}</div>
     <div>Actions taken: ${game.stats.actions}</div>
     <div>Friends: ${totalFriends(game)}</div>
-    ${game.phase>=2?'<div>Routines: '+Object.keys(game.routines).length+'</div>':''}
+    ${game.phase>=2?'<div>Automation modules: '+Object.keys(game.routines).length+'</div>':''}
     ${game.phase>=3?'<div>Initiatives: '+Object.keys(game.initiatives).length+'</div>':''}
     ${game.phase>=3?'<div>Team size: '+game.teamSize+'</div>':''}
     ${game.phase>=3?'<div>Board meetings: '+game.stats.boardMeetings+'</div>':''}
@@ -2493,7 +2468,6 @@ function gameTick() {
   }
 
   tickAutomation(dt);
-  tickRoutines(dt);
 
   // Phase 2+: Rep generation from friends
   if (game.phase >= 2) {
@@ -2648,9 +2622,6 @@ function rebuildDerivedState() {
   if (game.projects[4] === 'b') maxEnergyFromUpgrades *= 3;
   game.maxEnergy = Math.max(10, maxEnergyFromUpgrades);
   if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
-  game.routineRate = Math.max(0, Math.min(game.routineRate || 1, 10));
-  game.routineProgress = Math.max(0, game.routineProgress || 0);
-  game.routineCursor = Math.max(0, game.routineCursor || 0);
 
   reapplyUpgradeActionEffects();
   sanitizeAutomationState();
