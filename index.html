@@ -440,6 +440,7 @@ body { padding-top: 3px; }
   <div id="topbar-controls">
     <span id="time-played">0m 0s</span>
     <span id="last-updated">Updated: checking...</span>
+    <button onclick="showSuggestion()">Suggest</button>
     <button onclick="saveGame()">Save</button>
     <button onclick="showExport()">Export</button>
     <button onclick="showImport()">Import</button>
@@ -2682,6 +2683,21 @@ function showImport() {
     } catch(e) {
       alert('Invalid save data: ' + e.message);
     }
+  };
+  modal.classList.remove('modal-hidden');
+}
+
+function showSuggestion() {
+  const modal = document.getElementById('io-modal');
+  document.getElementById('io-title').textContent = 'Send a Suggestion';
+  document.getElementById('io-text').value = '';
+  document.getElementById('io-text').placeholder = 'Type a bug report, idea, balance suggestion, or feature request for Brian Simulator.';
+  document.getElementById('io-action-btn').textContent = 'Open GitHub Issue';
+  document.getElementById('io-action-btn').onclick = () => {
+    const text = document.getElementById('io-text').value.trim();
+    const title = encodeURIComponent(text ? `Suggestion: ${text.slice(0, 60)}` : 'Suggestion for Brian Simulator');
+    const body = encodeURIComponent(text || 'I have a suggestion for Brian Simulator.');
+    window.open(`https://github.com/yaportmax/Brian-Simulator/issues/new?title=${title}&body=${body}`, '_blank', 'noopener');
   };
   modal.classList.remove('modal-hidden');
 }
