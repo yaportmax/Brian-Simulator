@@ -2331,7 +2331,7 @@ function renderStats() {
   const el = document.getElementById('stats-display');
   el.innerHTML = `
     <div>Total Charisma earned: ${fmt(game.totalCp)}</div>
-    <div>Total Reputation: ${fmt(game.totalReputation)}</div>
+    ${game.phase>=2?'<div>Total Reputation: '+fmt(game.totalReputation)+'</div>':''}
     ${game.phase>=3?'<div>Total Influence: '+fmt(game.totalInfluence)+'</div>':''}
     ${game.phase>=4?'<div>Total Wisdom: '+fmt(game.totalWisdom)+'</div>':''}
     <div>Momentum: x${getPlaytimeProgressMult().toFixed(2)}</div>
